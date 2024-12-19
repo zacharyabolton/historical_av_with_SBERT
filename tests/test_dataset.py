@@ -73,6 +73,9 @@ class TestCustomDataset:
 
     def test_tokenization(self):
         tokens = self.dataset._A_tokens
+
+        print('TOKENS', tokens)
+        
         assert isinstance(
             tokens,
             transformers.tokenization_utils_base.BatchEncoding

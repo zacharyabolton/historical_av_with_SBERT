@@ -1,10 +1,7 @@
 """
-Prototype of Siamese SBERT inspired by the paper:
-    Momen Ibrahim, Ahmed Akram, Mohammed Radwan, Rana Ayman,
-    Mustafa Abd-El-Hameed, Nagwa M. El-Makky, and Marwan Torki.
-    2023. Enhancing Authorship Verification using Sentence-Transformers.
-    In Conference and Labs of the Evaluation Forum.
-    Retrieved from https://api.semanticscholar.org/CorpusID:264441704
+Prototype of Siamese SBERT inspired by Ibrahim et al. (2023) [7]:
+[7] Momen Ibrahim, Ahmed Akram, Mohammed Radwan, Rana Ayman, Mustafa Abd-El-Hameed, Nagwa M. El-Makky, and Marwan Torki. 2023. Enhancing Authorship Verification using Sentence-Transformers. In _Conference and Labs of the Evaluation Forum_. Retrieved from https://api.semanticscholar.org/CorpusID:264441704  # noqa E501
+
 
 This prototype does not handle any 'meta' operations of training/inference.
 Including but not limited to:
@@ -24,7 +21,7 @@ model to run a single inference.
 The model architecture at training time is as follows:
 1. > Sentence A & Sentence B are tokenized -------------------------------->
 2. -> Tokenized Sentences A & B are fed into SBERT using the
-        all-MiniLM-L12-v2 pre-trained model [1] --------------------------->
+        all-MiniLM-L12-v2 pre-trained model [^1] -------------------------->
 3. -> SBERT embeddings for A & B are fed through a mean pooling layer, which
         converts multiple word embeddings representing the whole sentence
         into a single embedding by averaging the embeddings for all tokens
@@ -44,7 +41,7 @@ The model architecture at inference time is as follows:
         against a decision threshold (to be implemented) to determine the
         label, 0, or 1.
 
-[1] https://huggingface.co/sentence-transformers/all-MiniLM-L12-v2
+[^1] https://huggingface.co/sentence-transformers/all-MiniLM-L12-v2
 """
 import torch
 import torch.nn as nn
@@ -117,6 +114,10 @@ class SiameseBERT(nn.Module):
         full sentence into one embedding. This does not include padding
         tokens.
 
+        Adapted from Tunstall et al. (2022) [30:276]:
+        [30] Lewis Tunstall, Leandro Von Werra, and Thomas Wolf. 2022. Natural language processing with transformers. “ O’Reilly Media, Inc.” Retrieved from https://books.google.com.br/books?id=nzxbEAAAQBAJ&lpg=PP1&ots=sUqiDWs3MI&dq=Natural%20Language%20Processing%20with%20Transformers%20%5BRevised%20Edition%5D%201098136799%2C%209781098136796%2C%209781098103248&lr&pg=PA224#v=onepage&q&f=false  # noqa E501
+
+
         :param token_embeddings: A tensor of embeddings representing the
             tokens of the tokenized input sentence.
         :type token_embeddings: torch.Tensor
@@ -154,11 +155,12 @@ class ContrastiveLoss(nn.Module):
     Inherits from `nn.Module`, the base class for all neural networks from
     PyTorch.
 
-    Adapted from:
-    R. Hadsell, S. Chopra, and Y. LeCun. 2006. Dimensionality Reduction by
-    Learning an Invariant Mapping. In 2006 IEEE Computer Society Conference
-    on Computer Vision and Pattern Recognition (CVPR’06), 1735–1742.
-    DOI:https://doi.org/10.1109/CVPR.2006.100
+    Adapted from Hadsell, Chopra, and LeCun (2006) [29]:
+    [29] R. Hadsell, S. Chopra, and Y. LeCun. 2006. Dimensionality Reduction by Learning an Invariant Mapping. In 2006 IEEE Computer Society Conference on Computer Vision and Pattern Recognition (CVPR’06), 1735–1742. DOI:https://doi.org/10.1109/CVPR.2006.100  # noqa E501
+
+
+    And Shairoz. (2021) [31]:
+    [31] ShairozS. 2021. losses.py. Gist 1a5e6953f0533cf19240ae1473eaedde. Retrieved November 4, 2024 from https://gist.github.com/ShairozS/1a5e6953f0533cf19240ae1473eaedde  # noqa E501
     """
 
     def __init__(self, margin=1.0):
