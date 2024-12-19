@@ -4,8 +4,6 @@ Dataset functions and classes.
 import random
 from torch.utils.data import Dataset
 from transformers import AutoTokenizer
-import numpy as np
-import pandas as pd
 import os
 from definitions import ROOT_DIR, MODEL
 import torch
