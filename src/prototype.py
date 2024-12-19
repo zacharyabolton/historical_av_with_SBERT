@@ -145,6 +145,10 @@ class SiameseBERT(nn.Module):
         # Calculate mean and normalize
         mean_embeddings = sum_embeddings / sum_mask
 
+        # # TODO: Consider normalizing embeddings
+        # embeddings_norm = torch.norm(mean_embeddings, p=2, dim=1, keepdim=True)
+        # normalized_embeddings = mean_embeddings / torch.clamp(embeddings_norm, min=1e-9)
+
         return mean_embeddings
 
 
