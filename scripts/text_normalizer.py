@@ -1,5 +1,5 @@
 """
-Loop through each document in the corpus and preprocess it in a similar
+Loop through each document in the corpus and normalize it in a similar
 fashion to Bolton (2024):
 
 Bolton, Z. 2024. True Love or Lost Cause. Gist
@@ -12,13 +12,12 @@ noise introduced by OCR in some of the collected works.
 This routine converts all text to lowercase and removes all non-alphanumeric
 characters.
 """
-from nltk.probability import FreqDist
 import os
 import re
 import argparse
 
 
-def remove_non_alpha_symbols(input_string):
+def remove_non_alphanum_symbols(input_string):
     """
     Remove all non-alphanumeric (a-z, and 0-9) and non-whitespace symbols.
     """
@@ -33,7 +32,7 @@ def remove_non_alpha_symbols(input_string):
     return ' '.join(alpha_string.split())
 
 
-def preprocess(data_dir, canonical_class_labels):
+def normalize(data_dir, canonical_class_labels):
     """
     Lowercase and remove all non-alphanumeric characters from an input text.
 
@@ -45,9 +44,9 @@ def preprocess(data_dir, canonical_class_labels):
     :type canonical_class_labels: list
     """
 
-    # Create new directory for preprocessed text
-    preprocessed_dir = os.path.join(data_dir, 'preprocessed')
-    os.makedirs(preprocessed_dir, exist_ok=True)
+    # Create new directory for normalized text
+    normalized_dir = os.path.join(data_dir, 'normalized')
+    os.makedirs(normalized_dir, exist_ok=True)
 
     # Set the path to the original undistorted data
     data_dir = os.path.join(data_dir, 'cleaned')
@@ -57,9 +56,9 @@ def preprocess(data_dir, canonical_class_labels):
     for label in canonical_class_labels:
         # Create the path to the class samples.
         class_dir = os.path.join(data_dir, label)
-        # Create an output path to the preprocessed class samples
-        preprocessed_class_dir = os.path.join(preprocessed_dir, label)
-        os.makedirs(preprocessed_class_dir, exist_ok=True)
+        # Create an output path to the normalized class samples
+        normalized_class_dir = os.path.join(normalized_dir, label)
+        os.makedirs(normalized_class_dir, exist_ok=True)
         # Loop through each file in the class directory.
         for file in os.listdir(class_dir):
             # Only process `.txt` files.
@@ -71,22 +70,23 @@ def preprocess(data_dir, canonical_class_labels):
                     # Lowercase the text
                     text = text.lower()
                     # Remove all non-alphanumeric characters
-                    text = remove_non_alpha_symbols(text)
-                    # Create path to new preprocessed file
-                    preprocessed_text_file = os.path.join(preprocessed_class_dir, file)
-                    # Save new preprocessed files
-                    with open(preprocessed_text_file, 'w') as f:
+                    text = remove_non_alphanum_symbols(text)
+                    # Create path to new normalized file
+                    normalized_text_file = os.path.join(normalized_class_dir,
+                                                        file)
+                    # Save new normalized files
+                    with open(normalized_text_file, 'w') as f:
                         f.write(text)
 
 
-def run_preprocessor(args):
+def run_normalizer(args):
     data_dir = args.data_dir
     canonical_class_names = args.canonical_class_names
 
     assert type(data_dir), 'str'
     assert type(canonical_class_names), 'list'
 
-    preprocess(data_dir, canonical_class_names)
+    normalize(data_dir, canonical_class_names)
 
 
 if __name__ == '__main__':
@@ -115,4 +115,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    run_preprocessor(args)
+    run_normalizer(args)

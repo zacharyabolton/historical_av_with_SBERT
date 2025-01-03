@@ -116,7 +116,7 @@ class CustomDataset(Dataset):
 
         return encoded_input
 
-    def _chunk_tokens(self, encoding, evaluate, chunk_size=4):
+    def _chunk_tokens(self, encoding, evaluate, chunk_size):
         """
         Chunk input tokens.
 

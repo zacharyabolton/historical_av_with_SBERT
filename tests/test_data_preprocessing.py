@@ -11,124 +11,9 @@ if scripts_path not in sys.path:
     sys.path.insert(0, scripts_path)
 
 # Import custom modules
-from text_preprocessor import preprocess  # noqa: E402
-from text_distorter import distort_text
+from text_normalizer import normalize  # noqa: E402
+from text_distorter import distort_text  # noqa: E402
 
-
-def test_dataset_preprocessing():
-    """
-    Test the precoessing pipeline, which should lowercase all text, and
-    remove all non-alphanumeric characters. It should write the preprocessed
-    results to files in a directory tree which mirrors its source tree.
-
-    This test tests both the output text as well as the resulting directory
-    structure.
-    """
-    test_dir = '../data/test'
-    preprocessing_test_dir = os.path.join(test_dir,
-                                          'preprocessing_test_data')
-
-    # Adapted from: https://stackoverflow.com/a/13118112
-    shutil.rmtree(preprocessing_test_dir, ignore_errors=True)
-    os.mkdir(preprocessing_test_dir)
-
-    # Create a mock source directory
-    cleaned_dir = os.path.join(preprocessing_test_dir, 'cleaned')
-    os.mkdir(cleaned_dir)
-
-    # Create mock sub-directories
-    A_dir = os.path.join(cleaned_dir, 'A')
-    notA_dir = os.path.join(cleaned_dir, 'notA')
-    U_dir = os.path.join(cleaned_dir, 'U')
-
-    os.mkdir(A_dir)
-    os.mkdir(notA_dir)
-    os.mkdir(U_dir)
-
-    # Create mock data
-    test_contents = [
-        'here is some text that should not be touched',           # A-0.txt
-        'Here is some text that should be touched',               # A-1.txt
-        'here are s0me 1ntegers',                                 # A-2.txt
-        'and sp*c|al cháracter$',                                 # A-3.txt
-        """here
-        is  some     white space""",                              # U-0.txt
-        'and back to untouched text',                             # U-1.txt
-        """
-        White space
-        CAPITALIZATIONS
-        **and special chars**!@#$%^&*()_-+=\\|~`
-        """,                                                      # U-2.txt
-        'white space      and CAPITALIZATIONS',                   # U-3.txt
-        'white space and special chars %#^&!@*!',              # notA-0.txt
-        'CAPS and spe^#@&@*!*(!cial ch372ars ',                # notA-1.txt
-        '',                                                    # notA-2.txt
-        ' - -------'                                           # notA-3.txt
-    ]
-
-    # Write mock data to appropriate files
-    num_files = 4
-    canonical_class_labels = sorted(os.listdir(cleaned_dir))
-    for i, canonical_class in enumerate(canonical_class_labels):
-        for j, test_file in enumerate(range(num_files)):
-            file_name = f"{canonical_class}-{test_file}.txt"
-            file_path = os.path.join(cleaned_dir, canonical_class, file_name)
-            with open(file_path, 'w') as f:
-                f.write(test_contents[i * num_files + j])
-
-    # Run the preprocessing routine
-    preprocess(preprocessing_test_dir, canonical_class_labels)
-
-    # Get path to expected output directory which should have been created
-    # by the `preprocess()` function.
-    expected_output_dir = os.path.join(preprocessing_test_dir,
-                                       'preprocessed')
-
-    # Hardcode the expected file contents output from the `preprocess()`
-    # function.
-    expected_output = [
-        'here is some text that should not be touched',           # A-0.txt
-        'here is some text that should be touched',               # A-1.txt
-        'here are s0me 1ntegers',                                 # A-2.txt
-        'and spcal chracter',                                     # A-3.txt
-        'here is some white space',                               # U-0.txt
-        'and back to untouched text',                             # U-1.txt
-        'white space capitalizations and special chars',          # U-2.txt
-        'white space and capitalizations',                        # U-3.txt
-        'white space and special chars',                       # notA-0.txt
-        'caps and special ch372ars',                           # notA-1.txt
-        '',                                                    # notA-2.txt
-        ''                                                     # notA-3.txt
-    ]
-
-    # Check that the `preprocess()` routine created the expected root
-    # directory.
-    assert os.path.isdir(expected_output_dir), True
-
-    # Loop through the sub directories in the expected root dir if it exists.
-    for i, canonical_class in enumerate(canonical_class_labels):
-        # Check that the expected sub-dirs exist.
-        assert os.path.isdir(
-            os.path.join(expected_output_dir, canonical_class)), True
-
-        # Loop through each file in the sub-dir
-        for j, test_file in enumerate(range(num_files)):
-            # Hardcode the expected file name and path.
-            file_name = f"{canonical_class}-{test_file}.txt"
-            file_path = os.path.join(expected_output_dir,
-                                     canonical_class,
-                                     file_name)
-
-            # Check that the expected file exists with the proper name.
-            assert os.path.exists(file_path), True
-
-            # Read in the file if it exists.
-            with open(file_path, 'r') as f:
-                contents = f.read()
-
-                # Check that the contents of the file output by the
-                # `preprocess()` function match the expected contents.
-                assert (expected_output[i * num_files + j] == contents), True
 
 
 class TestDVAlgos:
@@ -137,9 +22,9 @@ class TestDVAlgos:
     Multiple Asterisks (DV-MA) and Distorted View with Single Asterisk
     algorithms proposed in Stamatatos et al. (2017):
 
-    Efstathios Stamatatos. 2017. Authorship Attribution Using Text Distortion.
-    In Proceedings of the 15th Conference of the European Chapter of the
-    Association for Computational Linguistics: Volume 1, Long Papers,
+    Efstathios Stamatatos. 2017. Authorship Attribution Using Text
+    Distortion. In Proceedings of the 15th Conference of the European Chapter
+    of the Association for Computational Linguistics: Volume 1, Long Papers,
     Association for Computational Linguistics, Valencia, Spain, 1138–1149.
     Retrieved from https://aclanthology.org/E17-1107
 
@@ -176,21 +61,26 @@ class TestDVAlgos:
 
         test_dir = '../data/test'
         cls.distortion_test_dir = os.path.join(test_dir,
-                                           'distortion_test_data')
+                                               'distortion_test_data')
+        cls.normalizing_test_dir = os.path.join(test_dir,
+                                                'normalizing_test_data')
 
         # Adapted from: https://stackoverflow.com/a/13118112
         shutil.rmtree(cls.distortion_test_dir, ignore_errors=True)
         os.mkdir(cls.distortion_test_dir)
+        shutil.rmtree(cls.normalizing_test_dir, ignore_errors=True)
+        os.mkdir(cls.normalizing_test_dir)
+
 
         # Create a mock source directory
-        preprocessed_dir = os.path.join(cls.distortion_test_dir,
-                                        'undistorted')
-        os.mkdir(preprocessed_dir)
+        normalized_dir = os.path.join(cls.distortion_test_dir,
+                                      'undistorted')
+        os.mkdir(normalized_dir)
 
         # Create mock sub-directories
-        A_dir = os.path.join(preprocessed_dir, 'A')
-        notA_dir = os.path.join(preprocessed_dir, 'notA')
-        U_dir = os.path.join(preprocessed_dir, 'U')
+        A_dir = os.path.join(normalized_dir, 'A')
+        notA_dir = os.path.join(normalized_dir, 'notA')
+        U_dir = os.path.join(normalized_dir, 'U')
 
         os.mkdir(A_dir)
         os.mkdir(notA_dir)
@@ -199,12 +89,12 @@ class TestDVAlgos:
         # Write mock data to appropriate files
         cls.num_files = 4
 
-        cls.canonical_class_labels = sorted(os.listdir(preprocessed_dir))
+        cls.canonical_class_labels = sorted(os.listdir(normalized_dir))
 
         for i, canonical_class in enumerate(cls.canonical_class_labels):
             for j, test_file in enumerate(range(cls.num_files)):
                 file_name = f"{canonical_class}-{test_file}.txt"
-                file_path = os.path.join(preprocessed_dir,
+                file_path = os.path.join(normalized_dir,
                                          canonical_class,
                                          file_name)
                 with open(file_path, 'w') as f:
@@ -221,8 +111,9 @@ class TestDVAlgos:
         Runs once after all tests in this class have completed.
         Optional, if you want to remove the test data at the end or clean up.
         """
-        # Example: remove everything after we're done
-        # shutil.rmtree(cls.distortion_test_dir, ignore_errors=True)
+        # Remove everything after tests have run
+        shutil.rmtree(cls.distortion_test_dir, ignore_errors=True)
+        shutil.rmtree(cls.normalizing_test_dir, ignore_errors=True)
         pass
 
     def compare_contents(self, expected_output, output_dir):
@@ -452,3 +343,118 @@ class TestDVAlgos:
         ]
 
         self.compare_contents(expected_output, 'DV-SA-k-8')
+
+    def test_dataset_normalization(self):
+        """
+        Test the normalization pipeline, which should lowercase all text, and
+        remove all non-alphanumeric characters. It should write the
+        normalized results to files in a directory tree which mirrors its
+        source tree.
+
+        This test tests both the output text as well as the resulting
+        directory structure.
+        """
+
+        # Create a mock source directory
+        cleaned_dir = os.path.join(self.__class__.normalizing_test_dir,
+                                   'cleaned')
+        os.mkdir(cleaned_dir)
+
+        # Create mock sub-directories
+        A_dir = os.path.join(cleaned_dir, 'A')
+        notA_dir = os.path.join(cleaned_dir, 'notA')
+        U_dir = os.path.join(cleaned_dir, 'U')
+
+        os.mkdir(A_dir)
+        os.mkdir(notA_dir)
+        os.mkdir(U_dir)
+
+        # Create mock data
+        test_contents = [
+            'here is some text that should not be touched',      # A-0.txt
+            'Here is some text that should be touched',          # A-1.txt
+            'here are s0me 1ntegers',                            # A-2.txt
+            'and sp*c|al cháracter$',                            # A-3.txt
+            """here
+            is  some     white space""",                         # U-0.txt
+            'and back to untouched text',                        # U-1.txt
+            """
+            White space
+            CAPITALIZATIONS
+            **and special chars**!@#$%^&*()_-+=\\|~`
+            """,                                                 # U-2.txt
+            'white space      and CAPITALIZATIONS',              # U-3.txt
+            'white space and special chars %#^&!@*!',         # notA-0.txt
+            'CAPS and spe^#@&@*!*(!cial ch372ars ',           # notA-1.txt
+            '',                                               # notA-2.txt
+            ' - -------'                                      # notA-3.txt
+        ]
+
+        # Write mock data to appropriate files
+        num_files = 4
+        canonical_class_labels = sorted(os.listdir(cleaned_dir))
+        for i, canonical_class in enumerate(canonical_class_labels):
+            for j, test_file in enumerate(range(num_files)):
+                file_name = f"{canonical_class}-{test_file}.txt"
+                file_path = os.path.join(cleaned_dir,
+                                         canonical_class,
+                                         file_name)
+                with open(file_path, 'w') as f:
+                    f.write(test_contents[i * num_files + j])
+
+        # Run the normalizing routine
+        normalize(self.__class__.normalizing_test_dir,
+                   canonical_class_labels)
+
+        # Get path to expected output directory which should have been
+        # created by the `normalize()` function.
+        expected_output_dir = os.path.join(
+            self.__class__.normalizing_test_dir, 'normalized')
+
+        # Hardcode the expected file contents output from the `normalize()`
+        # function.
+        expected_output = [
+            'here is some text that should not be touched',      # A-0.txt
+            'here is some text that should be touched',          # A-1.txt
+            'here are s0me 1ntegers',                            # A-2.txt
+            'and spcal chracter',                                # A-3.txt
+            'here is some white space',                          # U-0.txt
+            'and back to untouched text',                        # U-1.txt
+            'white space capitalizations and special chars',     # U-2.txt
+            'white space and capitalizations',                   # U-3.txt
+            'white space and special chars',                  # notA-0.txt
+            'caps and special ch372ars',                      # notA-1.txt
+            '',                                               # notA-2.txt
+            ''                                                # notA-3.txt
+        ]
+
+        # Check that the `normalize()` routine created the expected root
+        # directory.
+        assert os.path.isdir(expected_output_dir), True
+
+        # Loop through the sub directories in the expected root dir if it
+        # exists.
+        for i, canonical_class in enumerate(canonical_class_labels):
+            # Check that the expected sub-dirs exist.
+            assert os.path.isdir(
+                os.path.join(expected_output_dir, canonical_class)), True
+
+            # Loop through each file in the sub-dir
+            for j, test_file in enumerate(range(num_files)):
+                # Hardcode the expected file name and path.
+                file_name = f"{canonical_class}-{test_file}.txt"
+                file_path = os.path.join(expected_output_dir,
+                                         canonical_class,
+                                         file_name)
+
+                # Check that the expected file exists with the proper name.
+                assert os.path.exists(file_path), True
+
+                # Read in the file if it exists.
+                with open(file_path, 'r') as f:
+                    contents = f.read()
+
+                    # Check that the contents of the file output by the
+                    # `normalize()` function match the expected contents.
+                    assert (expected_output[i * num_files + j] ==
+                            contents), True
