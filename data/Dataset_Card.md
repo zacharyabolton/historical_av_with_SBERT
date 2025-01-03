@@ -1,3 +1,7 @@
+---
+cssclasses:
+  - word-break-all-third-col
+---
 This is a dataset for Authorship Verification concerning the love letters attributed to General George E. Pickett C.S.A., published posthumously by his wife, LaSalle Corbell Pickett in her books _The Heart of a Soldier, As Revealed in the Intimate Letters of Gen'l George E. Pickett, C.S.A. (1913)_ and _Soldier of the South: General Pickett's War Letters to His Wife (edited by Arthur Crew Inman, 1928)_.
 
 It contains the love letters, known works of LaSalle, and 'imposter' works - works chosen for their authors' socio-demographic similarity to LaSalle or the general.
@@ -100,12 +104,26 @@ All works are stated as belonging to the public domain by [Project Gutenberg](ht
 | **The Heritage of The South by Jubal Anderson Early (1867)**                                                       | Project Gutenberg | https://www.gutenberg.org/ebooks/63254 | 2024-06-23        |
 ## ADDED LILA DATA
 **COPYWRITE STATUS**
-Distributed under a [CC BY-NC 4.0 license](https://creativecommons.org/licenses/by-nc/4.0/)
-Distributed by [**The Valley of the Shadow Project**](https://valley.newamericanhistory.org/):
-	Franklin County: All letters (1850-1880), Valley of the Shadow: Two Communities in the American Civil War (https://valley.newamericanhistory.org/search/letters/results?county=augusta).
-These works were preprocessed and obfuscated for ingestion into a machine learning algorithm focused on the task of authorship verification.
-This data and any data, models, or intellectual product derived thereof are not for commercial use.
 
-| **Item**                                                                                                                                   | **Source**                       | **URL**                                | **Acquired Date** |
-| ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- | -------------------------------------- | ----------------- |
-| **Misc. Letters from various Confederates living in Augusta County Virginia during, and immediately before and after the U.S. Civil War.** | The Valley of the Shadow Project | https://valley.newamericanhistory.org/ | 2024-12-18        |
+**Misc. Letters from various Confederates living in Augusta County Virginia during, and immediately before and after the U.S. Civil War.**
+    Distributed under a [CC BY-NC 4.0 license](https://creativecommons.org/licenses/by-nc/4.0/)
+    Distributed by [**The Valley of the Shadow Project**](https://valley.newamericanhistory.org/):
+    	Franklin County: All letters (1850-1880), Valley of the Shadow: Two Communities in the American Civil War (https://valley.newamericanhistory.org/search/letters/results?county=augusta).
+    These works were preprocessed and obfuscated for ingestion into a machine learning algorithm focused on the task of authorship verification.
+    This data and any data, models, or intellectual product derived thereof are not for commercial use.
+
+_All other workds_ were published before 1923, and therefore is in the public domain: <https://guides.library.oregonstate.edu/copyright/publicdomain#>
+
+| **Item**                                                                                                                                   | **Source**                       | **URL**                                             | **Acquired Date** |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- | --------------------------------------------------- | ----------------- |
+| **Misc. Letters from various Confederates living in Augusta County Virginia during, and immediately before and after the U.S. Civil War.** | The Valley of the Shadow Project | https://valley.newamericanhistory.org/              | 2024-12-18        |
+| **A Life of Gen. Robert E. Lee by John Esten Cooke (1871)**                                                                                | Project Gutenberg                | https://www.gutenberg.org/ebooks/10692              | 2024-12-26        |
+| **Mohun; Or, the Last Days of Lee and His Paladins. by John Esten Cooke (1869)**                                                           | Project Gutenberg                | https://www.gutenberg.org/ebooks/8424               | 2024-12-26        |
+| **The Youth of Jefferson by John Esten Cooke (1854)**                                                                                      | Project Gutenberg                | https://www.gutenberg.org/ebooks/23283              | 2024-12-27        |
+| **The Last of the Foresters by John Esten Cooke (1856)**                                                                                   | Project Gutenberg                | https://www.gutenberg.org/ebooks/10560              | 2024-12-27        |
+| **The Rise and Fall of the Confederate Government, Volume 1 by Jefferson Davis (1881)**                                                    | Project Gutenberg                | https://www.gutenberg.org/ebooks/19831              | 2024-12-27        |
+| **Belle Boyd in Camp and Prison. In Two Volumes. Vol. I. by Belle Boyd (1865)**                                                            | Documenting the American South   | https://docsouth.unc.edu/fpn/boyd1/menu.html        | 2024-12-27        |
+| **Belle Boyd in Camp and Prison. In Two Volumes. Vol. II. by Belle Boyd (1865)**                                                           | Documenting the American South   | https://docsouth.unc.edu/fpn/boyd2/menu.html        | 2024-12-27        |
+| **My Imprisonment and the First Year of Abolition Rule at Washington by Rose O'Neal Greenhow (1853)**                                      | Documenting the American South   | https://docsouth.unc.edu/fpn/greenhow/menu.html     | 2024-12-27        |
+| **Recollections Grave and Gay by Constance Cary Harrison (1911)**                                                                          | Documenting the American South   | https://docsouth.unc.edu/fpn/harrison/harrison.html | 2024-12-27        |
+| **A Confederate Girl's Diary by Sarah Morgan Dawson (1913)**                                                                               | Documenting the American South   | https://docsouth.unc.edu/fpn/dawson/dawson.html     | 2024-12-27        |

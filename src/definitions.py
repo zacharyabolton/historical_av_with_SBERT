@@ -1,3 +1,6 @@
+"""
+This file contains constants intended to be exposed globally.
+"""
 import os
 from pathlib import Path
 
