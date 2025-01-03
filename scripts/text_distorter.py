@@ -146,6 +146,16 @@ def dv_sa(text, W_k):
 
 
 def run_text_distorter(args):
+    """
+    Main worker routine of text_distorter.py script.
+    Creates directories for new 'views' of distorted corpus, reads in corpus
+    to distort, and saves to appropriate sub-directories.
+
+    :param args: argparse object coming from the CLI which bundles the
+    `data_dir`, `canonical_class_names`, and `k_values` parameters for use
+    in the primary worker loop for the text_distorter script.
+    :type args: argparse.Namespace
+    """
     data_dir = args.data_dir
     canonical_class_names = args.canonical_class_names
     ks = args.k_values
