@@ -145,25 +145,20 @@ def dv_sa(text, W_k):
     return ' '.join(words)
 
 
-def run_text_distorter(args):
+def distort_text(data_dir, canonical_class_names, ks):
     """
     Main worker routine of text_distorter.py script.
     Creates directories for new 'views' of distorted corpus, reads in corpus
     to distort, and saves to appropriate sub-directories.
 
-    :param args: argparse object coming from the CLI which bundles the
-    `data_dir`, `canonical_class_names`, and `k_values` parameters for use
-    in the primary worker loop for the text_distorter script.
-    :type args: argparse.Namespace
+    :param data_dir: Path to the parent dir of the source dataset.
+    :type data_dir: str
+    :param canonical_class_names: Names of subdirectories containing data by
+    class.
+    :type canonical_class_names: list
+    :param ks: Distortion values `k`.
+    :type ks: list
     """
-    data_dir = args.data_dir
-    canonical_class_names = args.canonical_class_names
-    ks = args.k_values
-
-    assert type(data_dir), 'str'
-    assert type(canonical_class_names), 'list'
-    assert type(ks), 'list'
-
     # Main loop
     for k in ks:
         # Get the top `k` most frequent words from the entire corpus.
@@ -204,6 +199,26 @@ def run_text_distorter(args):
                         f.write(dv_ma_text)
                     with open(sa_file_path, 'w') as f:
                         f.write(dv_sa_text)
+
+
+def run_text_distorter(args):
+    """
+    Wrapper for main worker routine of text_distorter.py script.
+
+    :param args: argparse object coming from the CLI which bundles the
+    `data_dir`, `canonical_class_names`, and `k_values` parameters for use
+    in the primary worker loop for the text_distorter script.
+    :type args: argparse.Namespace
+    """
+    data_dir = args.data_dir
+    canonical_class_names = args.canonical_class_names
+    ks = args.k_values
+
+    assert type(data_dir), 'str'
+    assert type(canonical_class_names), 'list'
+    assert type(ks), 'list'
+
+    distort_text(data_dir, canonical_class_names, ks)
 
 
 if __name__ == '__main__':

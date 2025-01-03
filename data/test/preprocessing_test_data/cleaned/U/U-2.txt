@@ -1,0 +1,5 @@
+
+        White space
+        CAPITALIZATIONS
+        **and special chars**!@#$%^&*()_-+=\|~`
+        
