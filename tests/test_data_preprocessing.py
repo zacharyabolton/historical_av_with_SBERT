@@ -1,7 +1,7 @@
 import os
 import sys
 import shutil
-from definitions import ROOT_DIR
+from constants import ROOT_DIR
 
 # Add scripts directory to sys.path
 # Adapted from Taras Alenin's answer on StackOverflow at:
@@ -108,13 +108,11 @@ class TestDVAlgos:
     @classmethod
     def teardown_class(cls):
         """
-        Runs once after all tests in this class have completed.
-        Optional, if you want to remove the test data at the end or clean up.
+        Clean up test data.
         """
         # Remove everything after tests have run
         shutil.rmtree(cls.distortion_test_dir, ignore_errors=True)
         shutil.rmtree(cls.normalizing_test_dir, ignore_errors=True)
-        pass
 
     def compare_contents(self, expected_output, output_dir):
         """
@@ -136,7 +134,7 @@ class TestDVAlgos:
 
         # Check that the `distort_text()` function created the expected view
         # directory.
-        assert os.path.isdir(source_dir)
+        assert os.path.isdir(source_dir) is True
 
         canonical_class_labels = sorted(os.listdir(source_dir))
 
@@ -145,7 +143,7 @@ class TestDVAlgos:
         for i, canonical_class in enumerate(canonical_class_labels):
             # Check that the expected sub-dirs exist.
             assert os.path.isdir(os.path.join(source_dir,
-                                              canonical_class)), True
+                                              canonical_class)) is True
 
             # Loop through each file in the sub-dir
             for j, test_file in enumerate(range(self.__class__.num_files)):
@@ -158,7 +156,7 @@ class TestDVAlgos:
                 # Check that the expected file exists with the proper name.
                 print(file_path)
                 print(os.path.exists(file_path))
-                assert os.path.exists(file_path)
+                assert os.path.exists(file_path) is True
 
                 # Read in the file if it exists.
                 with open(file_path, 'r') as f:
@@ -168,7 +166,7 @@ class TestDVAlgos:
                     # `distort_text()` function match the expected contents.
                     assert (
                         expected_output[i * self.__class__.num_files + j] ==
-                        contents), True
+                        contents) is True
 
     def test_dv_ma_k_0(self):
         """
@@ -430,14 +428,14 @@ class TestDVAlgos:
 
         # Check that the `normalize()` routine created the expected root
         # directory.
-        assert os.path.isdir(expected_output_dir), True
+        assert os.path.isdir(expected_output_dir) is True
 
         # Loop through the sub directories in the expected root dir if it
         # exists.
         for i, canonical_class in enumerate(canonical_class_labels):
             # Check that the expected sub-dirs exist.
             assert os.path.isdir(
-                os.path.join(expected_output_dir, canonical_class)), True
+                os.path.join(expected_output_dir, canonical_class)) is True
 
             # Loop through each file in the sub-dir
             for j, test_file in enumerate(range(num_files)):
@@ -448,7 +446,7 @@ class TestDVAlgos:
                                          file_name)
 
                 # Check that the expected file exists with the proper name.
-                assert os.path.exists(file_path), True
+                assert os.path.exists(file_path) is True
 
                 # Read in the file if it exists.
                 with open(file_path, 'r') as f:
@@ -457,4 +455,4 @@ class TestDVAlgos:
                     # Check that the contents of the file output by the
                     # `normalize()` function match the expected contents.
                     assert (expected_output[i * num_files + j] ==
-                            contents), True
+                            contents) is True

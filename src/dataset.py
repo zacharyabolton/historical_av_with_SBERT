@@ -5,7 +5,7 @@ import random
 from torch.utils.data import Dataset
 from transformers import AutoTokenizer
 import os
-from definitions import ROOT_DIR, MODEL
+from constants import ROOT_DIR, MODEL
 import torch
 
 
@@ -116,7 +116,7 @@ class CustomDataset(Dataset):
 
         return encoded_input
 
-    def _chunk_tokens(self, encoding, evaluate, chunk_size):
+    def _chunk_tokens(self, encoding, evaluate):
         """
         Chunk input tokens.
 
@@ -136,6 +136,10 @@ class CustomDataset(Dataset):
         :type encoding: transformers.tokenization_utils_base.BatchEncoding
         :rtype List[transformers.tokenization_utils_base.BatchEncoding]
         """
+
+        # Hard code chunk size to maximum all-MiniLM-L12-v2 input size.
+        chunk_size = 512
+
         # Make sure the input encoding is only for one document
         # as we will implement chunking downstream
         assert len(encoding['input_ids']) == 1
@@ -155,7 +159,8 @@ class CustomDataset(Dataset):
         chunk_size_reduced = chunk_size - 2
 
         chunks_input_ids = input_ids.split(chunk_size_reduced, dim=1)
-        chunks_attention_mask = attention_mask.split(chunk_size_reduced, dim=1)
+        chunks_attention_mask = attention_mask.split(chunk_size_reduced,
+                                                     dim=1)
 
         # Create tensors for special tokens
         cls_token = torch.tensor([[self.tokenizer.cls_token_id]],
@@ -170,6 +175,8 @@ class CustomDataset(Dataset):
         # TODO fix this hacky prototype train/eval splitting logic
         # For the prototype we are simply taking the first 64 chunks for
         # training and the last 64 for evaluation.
+        print(len(chunks_input_ids))
+        print(len(chunks_input_ids[0]))
         assert len(chunks_input_ids) >= 64 * 2
 
         if evaluate:

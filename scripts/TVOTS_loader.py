@@ -16,7 +16,7 @@ import sys
 import os
 import pandas as pd
 from bs4 import BeautifulSoup
-from definitions import ROOT_DIR
+from constants import ROOT_DIR
 
 # Add src directory to sys.path
 # Adapted from Taras Alenin's answer on StackOverflow at:
