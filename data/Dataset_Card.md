@@ -13,52 +13,67 @@ The contents of this dataset are structured in a hierarchical directory structur
 │   ├── A
 │   │   ├── across_my_path.txt
 │   │   └── ...
-│   ├── U
-│   │   ├── heart_of_soldier.txt
+│   ├── excluded
+│   │   ├── digging_through_to_manila.txt
 │   │   └── ...
-│   └── notA
-│       ├── balcony_stories.txt
+│   ├── notA
+│   │   ├── a_confederate_girls_diary.txt
+│   │   └── ...
+│   └── U
+│       ├── heart_of_soldier.txt
 │       └── ...
 ├── cleaning_in_process
 │   ├── george_pickett
 │   │   └── misc_excerpts.txt
 │   ├── imposters
-│   │   ├── balcony_stories/
+│   │   ├── a_confederate_girls_diary/
 │   │   └── ...
 │   ├── lasalle_corbell_pickett/
+│   │   ├── across_my_path/
 │   │   └── ...
 │   └── love_letters
 │       ├── heart_of_soldier/
 │       └── soldier_of_the_south/
+├── normalized
+│   ├── DV-MA-k-300
+│   │   ├── A
+│   │   ├── notA
+│   │   └── U
+│   ├── DV-...
+│   ├── DV-SA-k-300
+│   │   └── ...
+│   ├── DV-...
+│   └── undistorted
+│       └── ...
 ├── original
-│   ├── LILA_imposters
-│   │   ├── content
-│   │   └── metadata
+│   ├── lasalle_corbell_pickett
+│   │   ├── acrossmypath00pick_djvu.xml
+│   │   └── ...
 │   ├── LIL_imposters
 │   │   ├── balcony_stories.html
 │   │   └── ...
-│   ├── lasalle_corbell_pickett
-│   │   ├── acrossmypath00pick_djvu.xml
+│   ├── LILA_imposters
+│   │   ├── a_confederate_girls_diary.html
 │   │   └── ...
 │   └── love_letters
 │       ├── heartofsoldieras00pick_djvu.xml
 │       └── soldier_of_the_south
 └── test
-    ├── A
-    │   ├── foo.txt
-    │   └── ...
-    ├── U
-    │   ├── bar.txt
-    │   └── ...
-    └── notA
-        ├── baz.txt
-        └── ...
+    └── ...
 ```
 
-Where `original/` are the original works, `cleaned/` are the works intended for model ingestion, `cleaning_in_process/` are intermediate versions of the works before `cleaned/`, and `test/` is fake data for debugging and testing.
+Where:
+- `original/` are the original works.
+- `cleaned/` are the original works with extraneous data removed, such as OCR artifacts, markup, metadata, and non-authorial quotations and insertions.
+- `normalized/` is the cleaned data that has been lowercased and had non alphanumeric characters removed.
+    - `normalized/` also contains its own distorted views based on the procedure describe in Stamatatos et al. (2017) [^1], where the first part of the subdirectories name indicates the algorithm used (DV-MA/DV-SA) and the second part indicates the $k$ value used (k-300, k-3000, etc...).
+    - `normalized/` is intended for model ingestion.
+- `cleaning_in_process/` are intermediate versions of the works before `cleaned/`. 
+- `test/` is fake data for debugging and testing.
+    - `test/` should be empty as the data is created and cleaned up programmatically by the `pytest` test suite.
 
 The `A`, `notA`, and `U` datasets are especially named for model ingestion as the model expects a path to the parent of these three directories. `A` indicates works by the known author. `notA` indicates 'imposter' works. `U` is the work(s) of unknown authorship.
-## LIL DATASET CONTENTS
+## ORIGINAL LIL DATASET CONTENTS
 **<mark>A NOTE ON THE CONTENTS THIS OF DATASET:</mark>** Given that these works are written by Southern confederates during the time of the American Civil War, the contents are highly objectionable, consisting of xenophobic and anti-black rhetoric, pro-slavery arguments, and eye-dialect, among other problematic speech. **Please inspect this data with caution**.
 ##### LaSalle Corbell Pickett
 **COPYWRITE STATUS**
@@ -105,7 +120,7 @@ All works are stated as belonging to the public domain by [Project Gutenberg](ht
 ## ADDED LILA DATA
 **COPYWRITE STATUS**
 
-**Misc. Letters from various Confederates living in Augusta County Virginia during, and immediately before and after the U.S. Civil War.**
+**Misc. Letters from various Confederates living in Augusta County Virginia during, and immediately before and after the U.S. Civil War.** (_TVOTS_)
     Distributed under a [CC BY-NC 4.0 license](https://creativecommons.org/licenses/by-nc/4.0/)
     Distributed by [**The Valley of the Shadow Project**](https://valley.newamericanhistory.org/):
     	Franklin County: All letters (1850-1880), Valley of the Shadow: Two Communities in the American Civil War (https://valley.newamericanhistory.org/search/letters/results?county=augusta).
@@ -114,16 +129,20 @@ All works are stated as belonging to the public domain by [Project Gutenberg](ht
 
 _All other workds_ were published before 1923, and therefore is in the public domain: <https://guides.library.oregonstate.edu/copyright/publicdomain#>
 
-| **Item**                                                                                                                                   | **Source**                       | **URL**                                             | **Acquired Date** |
-| ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- | --------------------------------------------------- | ----------------- |
-| **Misc. Letters from various Confederates living in Augusta County Virginia during, and immediately before and after the U.S. Civil War.** | The Valley of the Shadow Project | https://valley.newamericanhistory.org/              | 2024-12-18        |
-| **A Life of Gen. Robert E. Lee by John Esten Cooke (1871)**                                                                                | Project Gutenberg                | https://www.gutenberg.org/ebooks/10692              | 2024-12-26        |
-| **Mohun; Or, the Last Days of Lee and His Paladins. by John Esten Cooke (1869)**                                                           | Project Gutenberg                | https://www.gutenberg.org/ebooks/8424               | 2024-12-26        |
-| **The Youth of Jefferson by John Esten Cooke (1854)**                                                                                      | Project Gutenberg                | https://www.gutenberg.org/ebooks/23283              | 2024-12-27        |
-| **The Last of the Foresters by John Esten Cooke (1856)**                                                                                   | Project Gutenberg                | https://www.gutenberg.org/ebooks/10560              | 2024-12-27        |
-| **The Rise and Fall of the Confederate Government, Volume 1 by Jefferson Davis (1881)**                                                    | Project Gutenberg                | https://www.gutenberg.org/ebooks/19831              | 2024-12-27        |
-| **Belle Boyd in Camp and Prison. In Two Volumes. Vol. I. by Belle Boyd (1865)**                                                            | Documenting the American South   | https://docsouth.unc.edu/fpn/boyd1/menu.html        | 2024-12-27        |
-| **Belle Boyd in Camp and Prison. In Two Volumes. Vol. II. by Belle Boyd (1865)**                                                           | Documenting the American South   | https://docsouth.unc.edu/fpn/boyd2/menu.html        | 2024-12-27        |
-| **My Imprisonment and the First Year of Abolition Rule at Washington by Rose O'Neal Greenhow (1853)**                                      | Documenting the American South   | https://docsouth.unc.edu/fpn/greenhow/menu.html     | 2024-12-27        |
-| **Recollections Grave and Gay by Constance Cary Harrison (1911)**                                                                          | Documenting the American South   | https://docsouth.unc.edu/fpn/harrison/harrison.html | 2024-12-27        |
-| **A Confederate Girl's Diary by Sarah Morgan Dawson (1913)**                                                                               | Documenting the American South   | https://docsouth.unc.edu/fpn/dawson/dawson.html     | 2024-12-27        |
+| **Item**                                                                                                                                      | **Source**                       | **URL**                                             | **Acquired Date** |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------------------------- | ----------------- |
+| **Misc. Letters from various Confederates living in Augusta County Virginia during, and immediately before and after the U.S. Civil War.** \* | The Valley of the Shadow Project | https://valley.newamericanhistory.org/              | 2024-12-18        |
+| **A Life of Gen. Robert E. Lee by John Esten Cooke (1871)**                                                                                   | Project Gutenberg                | https://www.gutenberg.org/ebooks/10692              | 2024-12-26        |
+| **Mohun; Or, the Last Days of Lee and His Paladins. by John Esten Cooke (1869)**                                                              | Project Gutenberg                | https://www.gutenberg.org/ebooks/8424               | 2024-12-26        |
+| **The Rise and Fall of the Confederate Government, Volume 1 by Jefferson Davis (1881)**                                                       | Project Gutenberg                | https://www.gutenberg.org/ebooks/19831              | 2024-12-27        |
+| **Belle Boyd in Camp and Prison. In Two Volumes. Vol. I. by Belle Boyd (1865)**                                                               | Documenting the American South   | https://docsouth.unc.edu/fpn/boyd1/menu.html        | 2024-12-27        |
+| **Belle Boyd in Camp and Prison. In Two Volumes. Vol. II. by Belle Boyd (1865)**                                                              | Documenting the American South   | https://docsouth.unc.edu/fpn/boyd2/menu.html        | 2024-12-27        |
+| **My Imprisonment and the First Year of Abolition Rule at Washington by Rose O'Neal Greenhow (1853)**                                         | Documenting the American South   | https://docsouth.unc.edu/fpn/greenhow/menu.html     | 2024-12-27        |
+| **Recollections Grave and Gay by Constance Cary Harrison (1911)**                                                                             | Documenting the American South   | https://docsouth.unc.edu/fpn/harrison/harrison.html | 2024-12-27        |
+| **A Confederate Girl's Diary by Sarah Morgan Dawson (1913)**                                                                                  | Documenting the American South   | https://docsouth.unc.edu/fpn/dawson/dawson.html     | 2024-12-27        |
+
+\* _NOTE_: TVOTS texts only appear in the `/original` subdirectory, as it was decided not to include them in the final project, due to concerns with data biasing. So, preprocessing was not performed in this instance.
+
+---
+
+[^1]: Efstathios Stamatatos. 2017. Authorship Attribution Using Text Distortion. In Proceedings of the 15th Conference of the European Chapter of the Association for Computational Linguistics: Volume 1, Long Papers, Association for Computational Linguistics, Valencia, Spain, 1138–1149. Retrieved from [https://aclanthology.org/E17-1107](https://aclanthology.org/E17-1107)

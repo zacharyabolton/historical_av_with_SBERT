@@ -1,0 +1,34 @@
+file,author_short,author,genre,imposter_for,canonical_class_label,class,omit,num_words
+mohun_or_the_last_days_of_lee_and_his_paladins.txt,jec,John Esten Cooke,Pros/Fiction,George,notA,0,FALSE,163689
+from_manassas_to_appomattox.txt,jls,James Longstreet,Pros/Historical & Biographical,George,notA,0,FALSE,161994
+the_rise_and_fall_of_the_confederate_government_volume_1.txt,jdv,Jefferson Davis,Pros/Historical & Biographical,George,notA,0,FALSE,132255
+heritage_of_the_south.txt,jae,Jubal Anderson Early,Pros/Historical & Biographical,George,notA,0,FALSE,32166
+recollections_and_letters.txt,rel,Robert E. Lee,Pros/Historical & Biographical,George,notA,0,FALSE,137833
+balcony_stories.txt,gek,Grace Elizabeth King,Pros/Fiction,LaSalle,notA,0,FALSE,34796
+belle_boyd_in_camp_and_prison_vol_1.txt,bbd,Belle Boyd,Pros/Historical & Biographical,LaSalle,notA,0,FALSE,34594
+belle_boyd_in_camp_and_prison_vol_2.txt,bbd,Belle Boyd,Pros/Historical & Biographical,LaSalle,notA,0,FALSE,35303
+recollections_grave_and_gay.txt,cch,Constance Cary Harrison,Pros/Historical & Biographical,LaSalle,notA,0,FALSE,101195
+lee_and_longstreet.txt,hdl,Helen D. Longstreet,Pros/Historical & Biographical,LaSalle,notA,0,FALSE,77605
+diary_from_dixie.txt,mbc,Mary Boykin Chesnut,Pros/Historical & Biographical,LaSalle,notA,0,FALSE,128122
+my_imprisonment_and_the_first_year_of_abolition_rule_at_washington.txt,rog,Rose O'Neal Greenhow,Pros/Historical & Biographical,LaSalle,notA,0,FALSE,59643
+a_confederate_girls_diary.txt,smd,Sarah Morgan Dawson,Pros/Historical & Biographical,LaSalle,notA,0,FALSE,116071
+ebil_eye.txt,lcp,LaSalle Corbell Pickett,Pros/Fiction,-,A,1,FALSE,5077
+jinny.txt,lcp,LaSalle Corbell Pickett,Pros/Fiction,-,A,1,FALSE,2523
+kunnoo_sperits_others.txt,lcp,LaSalle Corbell Pickett,Pros/Fiction,-,A,1,FALSE,2521
+yule_log.txt,lcp,LaSalle Corbell Pickett,Pros/Fiction,-,A,1,FALSE,7157
+across_my_path.txt,lcp,LaSalle Corbell Pickett,Pros/Historical & Biographical,-,A,1,FALSE,20827
+bugles_of_gettysburg.txt,lcp,LaSalle Corbell Pickett,Pros/Historical & Biographical,-,A,1,FALSE,23014
+fourth_massachusetts_cavalry.txt,lcp,LaSalle Corbell Pickett,Pros/Historical & Biographical,-,A,1,FALSE,1312
+literary_hearthstones_dixie.txt,lcp,LaSalle Corbell Pickett,Pros/Historical & Biographical,-,A,1,FALSE,35865
+pickett_his_men.txt,lcp,LaSalle Corbell Pickett,Pros/Historical & Biographical,-,A,1,FALSE,105036
+what_happened_to_me.txt,lcp,LaSalle Corbell Pickett,Pros/Historical & Biographical,-,A,1,FALSE,75585
+a_life_of_gen_robert_e_lee.txt,jec,John Esten Cooke,Pros/Historical & Biographical,George,notA,0,TRUE,128418
+macaria.txt,aje,Augusta J. Evans,Pros/Fiction,LaSalle,notA,0,TRUE,88777
+speckled_bird.txt,aje,Augusta J. Evans,Pros/Fiction,LaSalle,notA,0,TRUE,111879
+st_elmo.txt,aje,Augusta J. Evans,Pros/Fiction,LaSalle,notA,0,TRUE,177893
+vashti.txt,aje,Augusta J. Evans,Pros/Fiction,LaSalle,notA,0,TRUE,156787
+digging_through_to_manila.txt,lcp,LaSalle Corbell Pickett,Poems,-,A,1,TRUE,851
+introduction_heart_of_solider.txt,lcp,LaSalle Corbell Pickett,Pros/Misc.,-,A,1,TRUE,4548
+note_from_heart_of_soldier.txt,lcp,LaSalle Corbell Pickett,Pros/Misc.,-,A,1,TRUE,233
+heart_of_soldier.txt,-,-,Love Letters,-,U,,TRUE,26213
+soldier_of_the_south.txt,-,-,Love Letters,-,U,,TRUE,13742

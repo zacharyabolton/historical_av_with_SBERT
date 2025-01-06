@@ -1,5 +1,9 @@
 """
 Dataset functions and classes.
+
+Adapted for this project from the PyTorch (https://pytorch.org/)
+documentation at:
+https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files
 """
 import random
 from torch.utils.data import Dataset
@@ -32,7 +36,7 @@ def collate_fn(batch):
     return batched_a, batched_b, labels
 
 
-class CustomDataset(Dataset):
+class LILADataset(Dataset):
     """
     Custom torch dataset.
 
@@ -40,7 +44,7 @@ class CustomDataset(Dataset):
     :type data_dir: string
     """
 
-    def __init__(self, data_dir, chunk_size):
+    def __init__(self, data_dir, chunk_size, random_seed=None):
         assert (chunk_size > 2), ("Your chunk size is too small."
                                   " Please increase.")
 
@@ -48,6 +52,10 @@ class CustomDataset(Dataset):
 
         self._data_dir = data_dir
         self._chunk_size = chunk_size
+        self._random_seed = random_seed
+        # Initialize the random module with a seed. If unspecified, defaults
+        # `None` which means it will be non-deterministic and unrepeatable.
+        random.seed(self._random_seed)
 
         self._A_dir = os.path.join(self._data_dir, "A")
         self._U_dir = os.path.join(self._data_dir, "U")
@@ -61,12 +69,12 @@ class CustomDataset(Dataset):
         self._U_docs_tokenized = self._tokenize(self._U_docs)
         self._notA_docs_tokenized = self._tokenize(self._notA_docs)
 
-        self._A_chunks = self._chunk_tokens(self._A_docs_tokenized)
-        # self._U_chunks = self._chunk_tokens(self._U_docs_tokenized)
-        # self._notA_chunks = self._chunk_tokens(self._notA_docs_tokenized)
+        self._A_docs_chunked = self._chunk_tokens(self._A_docs_tokenized)
+        self._U_docs_chunked = self._chunk_tokens(self._U_docs_tokenized)
+        self._notA_docs_chunked = self._chunk_tokens(self._notA_docs_tokenized)
 
-        # self._pairs = self._create_pairs(self._A_chunks,
-        #                                  self._notA_chunks)
+        self._pairs = self._create_pairs(self._A_docs_chunked,
+                                         self._notA_docs_chunked)
 
     def __len__(self):
         """
@@ -207,30 +215,46 @@ class CustomDataset(Dataset):
 
         return chunked_encodings
 
-    def _create_pairs(self, A_chunks, notA_chunks):
+    def _create_pairs(self, A_docs_chunked, notA_docs_chunked):
         """
-        Create training pairs as DataFrame.
+        Create training pairs.
 
-        :returns: Training pairs as a Pandas DataFrame.
-        :rtype: pandas.core.frame.DataFrame
+        :param A_docs_chunked: A list of lists containing chunks of tokenized
+        documents by the known author `A`. Each item in the root list
+        represents a document, and each item in each sub list represents a
+        chunk of it's respetive document.
+        :type A_docs_chunked: list
+        :param notA_docs_chunked: Similar to `A_docs_chunked` but for
+        documents by imposter authors `notA`.
+        :type notA_docs_chunked: list
+        :returns: Training pairs of either same-author type (label = 1) or
+        different-author type (label = 0).
+        :rtype: list
         """
+        # Flatten the `A_docs_chunked` list
+        # Adapted from:
+        # https://www.designgurus.io/answers/detail/how-do-i-make-a-flat-list-out-of-a-list-of-lists-in-python
+        A_docs_chunked = [element for sublist
+                          in A_docs_chunked for element
+                          in sublist]
         # Create positive pairs (same author)
         same_auth_pairs = []
-        for i in range(len(A_chunks)):
+        for i in range(len(A_docs_chunked)):
             # Note: i + 1 prevents self-pairs
-            for j in range(i + 1, len(A_chunks)):
-                same_auth_pairs.append((A_chunks[i], A_chunks[j], 1))
+            for j in range(i + 1, len(A_docs_chunked)):
+                same_auth_pairs.append((A_docs_chunked[i], A_docs_chunked[j], 1))
 
+        # Flatten the `notA_docs_chunked` list
+        # Adapted from:
+        # https://www.designgurus.io/answers/detail/how-do-i-make-a-flat-list-out-of-a-list-of-lists-in-python
+        notA_docs_chunked = [element for sublist
+                             in notA_docs_chunked for element
+                             in sublist]
         # Create negative pairs (different authors)
         diff_auth_pairs = []
-        for A_chunk in A_chunks:
-            for notA_chunk in notA_chunks:
+        for A_chunk in A_docs_chunked:
+            for notA_chunk in notA_docs_chunked:
                 diff_auth_pairs.append((A_chunk, notA_chunk, 0))
-
-        # Balance positive and negative samples
-        min_samples = min(len(same_auth_pairs), len(diff_auth_pairs))
-        same_auth_pairs = random.sample(same_auth_pairs, min_samples)
-        diff_auth_pairs = random.sample(diff_auth_pairs, min_samples)
 
         # Combine
         all_pairs = same_auth_pairs + diff_auth_pairs

@@ -1,3 +1,22 @@
+"""
+This test suite tests this project's implementation of text text
+normalization procedure from Bolton (2024) [5] (minus numeral removal) and
+the Distorted View with Multiple Asterisks (DV-MA) and Distorted View with
+Single Asterisk algorithms proposed in Stamatatos et al. (2017) [12]:
+
+[5] Bolton, Z. 2024. True Love or Lost Cause. Gist
+34bd09f76f94111ac0113fb5da1ea14e. Retrieved November 8, 2024 from https://gist.github.com/zacharyabolton/34bd09f76f94111ac0113fb5da1ea14e
+
+[12] Efstathios Stamatatos. 2017. Authorship Attribution Using Text
+Distortion. In Proceedings of the 15th Conference of the European Chapter
+of the Association for Computational Linguistics: Volume 1, Long Papers,
+Association for Computational Linguistics, Valencia, Spain, 1138–1149.
+Retrieved from https://aclanthology.org/E17-1107
+
+For distorion tests, it tests varying values of `k` (the number of most
+occuring vocabulary of words to preserve and not distort) including edge
+cases.
+"""
 import os
 import sys
 import shutil
@@ -15,26 +34,18 @@ from text_normalizer import normalize  # noqa: E402
 from text_distorter import distort_text  # noqa: E402
 
 
-
-class TestDVAlgos:
+class TestPreprocessing:
     """
-    This test tests this project's implementation of the Distorted View with
-    Multiple Asterisks (DV-MA) and Distorted View with Single Asterisk
-    algorithms proposed in Stamatatos et al. (2017):
-
-    Efstathios Stamatatos. 2017. Authorship Attribution Using Text
-    Distortion. In Proceedings of the 15th Conference of the European Chapter
-    of the Association for Computational Linguistics: Volume 1, Long Papers,
-    Association for Computational Linguistics, Valencia, Spain, 1138–1149.
-    Retrieved from https://aclanthology.org/E17-1107
-
-    It tests varying values of `k` (the number of most occuring vocabulary of
-    words to preserve and not distort) including edge cases.
+    A unified class to allow for easy setup and teardown of global and reused
+    data and objects, and sharing of common methods. See `setup_class`,
+    `teardown_class`, `compare_contents`.
     """
     @classmethod
     def setup_class(cls):
         """
-        The follwing dataset should have the following word frequencies:
+        Setup global and reused test data and objects.
+
+        The mock dataset should have the following word frequencies:
         - elit:        1
         - adipiscing:  2
         - consectetur: 3
