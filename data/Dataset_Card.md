@@ -43,8 +43,9 @@ The contents of this dataset are structured in a hierarchical directory structur
 │   ├── DV-SA-k-300
 │   │   └── ...
 │   ├── DV-...
-│   └── undistorted
-│       └── ...
+│   ├── undistorted
+│   │   └── ...
+│   └── metadata.csv
 ├── original
 │   ├── lasalle_corbell_pickett
 │   │   ├── acrossmypath00pick_djvu.xml
@@ -68,6 +69,7 @@ Where:
 - `normalized/` is the cleaned data that has been lowercased and had non alphanumeric characters removed.
     - `normalized/` also contains its own distorted views based on the procedure describe in Stamatatos et al. (2017) [^1], where the first part of the subdirectories name indicates the algorithm used (DV-MA/DV-SA) and the second part indicates the $k$ value used (k-300, k-3000, etc...).
     - `normalized/` is intended for model ingestion.
+    - `normalized/` contains a special `metadata.csv` file with metadata related to the contents intended for programmatic data balancing during processing.
 - `cleaning_in_process/` are intermediate versions of the works before `cleaned/`. 
 - `test/` is fake data for debugging and testing.
     - `test/` should be empty as the data is created and cleaned up programmatically by the `pytest` test suite.
