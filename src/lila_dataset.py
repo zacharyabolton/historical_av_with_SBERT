@@ -14,7 +14,7 @@ import torch
 import pandas as pd
 import math
 import copy
-# import torch.nn.functional as F  # Only needed if preserving ending chunks
+# import torch.nn.functional as F  # Only if preserving ending chunks
 
 
 def collate_fn(batch):
@@ -22,18 +22,20 @@ def collate_fn(batch):
     Collate function to properly batch the paired inputs.
     """
     # Separate the batch components
-    chunk_a = [item[0] for item in batch]
-    chunk_b = [item[1] for item in batch]
+    chnk_a = [item[0] for item in batch]
+    chnk_b = [item[1] for item in batch]
     labels = torch.tensor([item[2] for item in batch])
 
     # Combine input_ids and attention_masks
     batched_a = {
-        'input_ids': torch.cat([x['input_ids'] for x in chunk_a]),
-        'attention_mask': torch.cat([x['attention_mask'] for x in chunk_a])
+        'input_ids': torch.cat([x['input_ids'] for x in chnk_a]),
+        'attention_mask': torch.cat([x['attention_mask']
+                                     for x in chnk_a])
     }
     batched_b = {
-        'input_ids': torch.cat([x['input_ids'] for x in chunk_b]),
-        'attention_mask': torch.cat([x['attention_mask'] for x in chunk_b])
+        'input_ids': torch.cat([x['input_ids'] for x in chnk_b]),
+        'attention_mask': torch.cat([x['attention_mask']
+                                     for x in chnk_b])
     }
 
     return batched_a, batched_b, labels
@@ -50,58 +52,60 @@ class LILADataset(Dataset):
     def __init__(self,
                  data_dir,
                  metadata_path,
-                 chunk_size,
+                 chnk_size,
                  num_pairs,
                  device,
                  seed=None):
         """
-        Constructor for setting up data members needed for the LILADataset.
+        Constructor for setting up data members needed for the
+        LILADataset.
 
         :param data_dir: <Required> The path to the data preprocessed data
-        for ingestion. Expects a directory with subdirectories `A`, `notA`,
-        and `U`, each containing `.txt` files.
+        for ingestion. Expects a directory with subdirectories `A`,
+        `notA`, and `U`, each containing `.txt` files.
         :type data_dir: str
 
         :param metadata_path: <Required> The path to the metadata file.
-        Expects a path to a `.csv` file with columns ['file', 'author_short',
-        'author', 'genre', 'imposter_for', 'canonical_class_label', 'class',
-        'omit', 'num_words'] and rows containing unique 'file' values
-        matching at least every `.txt` file in the subdirectories, and
-        'canonical_class_labels' matching that file's parent directory name:
-        `A`, `notA`, or `U`.
+        Expects a path to a `.csv` file with columns ['file',
+        'author_short', 'author', 'genre', 'imposter_for',
+        'canonical_class_label', 'class', 'omit', 'num_words'] and rows
+        containing unique 'file' values matching at least every `.txt`
+        file in the subdirectories, and 'canonical_class_labels' matching
+        that file's parent directory name: `A`, `notA`, or `U`.
         :type metadata_path: str
 
-        :param chunk_size: <Required> Maximum length, in tokens, of each
-        chunk generated, including the special BERT [CLS] and [SEP] tokens.
-        Currently all chunks have this length as ending chunks that could be
-        padded are being thrown out.
-        :type chunk_size: int
+        :param chnk_size: <Required> Maximum length, in tokens, of each
+        chunk generated, including the special BERT [CLS] and [SEP]
+        tokens.
+        Currently all chunks have this length as ending chunks that could
+        be padded are being thrown out.
+        :type chnk_size: int
 
         :param num_pairs: <Required> The total number of same-author and
-        different-author pairs, combined, to generate. Must be an even number
-        for data-balancing purposes.
+        different-author pairs, combined, to generate. Must be an even
+        number for data-balancing purposes.
         :type num_pairs: int
 
-        :param device: <Required> The device to run tensor operations on. For
-        use in paralelization/cuncurrency to speed up training.
+        :param device: <Required> The device to run tensor operations on.
+        For use in paralelization/cuncurrency to speed up training.
         :type device: str
 
-        :param seed: <Optional> An integer to pass in to the `random` module
-        as a seed, for reproducibility. Defaults to `None` which causes the
-        `random` module to use the system clock as a seed.
+        :param seed: <Optional> An integer to pass in to the `random`
+        module as a seed, for reproducibility. Defaults to `None` which
+        causes the `random` module to use the system clock as a seed.
         :type seed: int
         """
 
-        assert (chunk_size > 2), ("Your chunk size is too small."
+        assert (chnk_size > 2), ("Your chunk size is too small."
                                   " Please increase.")
-        assert (num_pairs % 2) == 0, ("Please use an even number of pairs "
-                                      "for data balancing.")
+        assert (num_pairs % 2) == 0, ("Please use an even number of"
+                                      " pairs for data balancing.")
 
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL)
 
         self._data_dir = data_dir
         self._metadata_path = metadata_path
-        self._chunk_size = chunk_size
+        self._chnk_size = chnk_size
         self._num_pairs = num_pairs
         self._device = device
         self._seed = seed
@@ -120,13 +124,13 @@ class LILADataset(Dataset):
         self._U_docs_tokenized = self._tokenize(self._U_docs)
         self._notA_docs_tokenized = self._tokenize(self._notA_docs)
 
-        self._A_docs_chunked = self._chunk_tokens(self._A_docs_tokenized)
-        self._U_docs_chunked = self._chunk_tokens(self._U_docs_tokenized)
-        self._notA_docs_chunked = self._chunk_tokens(
+        self._A_docs_chnked = self._chnk_tokens(self._A_docs_tokenized)
+        self._U_docs_chnked = self._chnk_tokens(self._U_docs_tokenized)
+        self._notA_docs_chnked = self._chnk_tokens(
             self._notA_docs_tokenized)
 
-        self._pairs = self._create_pairs(self._A_docs_chunked,
-                                         self._notA_docs_chunked)
+        self._pairs = self._create_pairs(self._A_docs_chnked,
+                                         self._notA_docs_chnked)
 
     def __len__(self):
         """
@@ -149,8 +153,8 @@ class LILADataset(Dataset):
         :type dir: string
 
         :returns: list of tuples, where the first tuple element is the
-        associated index for the given file in the `self._metadata` member,
-        and the second element is the raw contents of the file.
+        associated index for the given file in the `self._metadata`
+        member, and the second element is the raw contents of the file.
         :rtype: list
         """
         docs = []
@@ -170,16 +174,16 @@ class LILADataset(Dataset):
         Tokenize input docs.
         Preserves document boundaries.
 
-        :param docs: <Required> List of tuples representing the documents in
-        a given class (A, notA, U), where the first tuple element is the
-        associated index for the given file in the `self._metadata` member,
-        and the second element is the raw contents of the file.
+        :param docs: <Required> List of tuples representing the documents
+        in a given class (A, notA, U), where the first tuple element is
+        the associated index for the given file in the `self._metadata`
+        member, and the second element is the raw contents of the file.
         :type docs: list
 
         :returns: list of tuples, where the first tuple element is the
-        associated index for the given file in the `self._metadata` member,
-        and the second element is a PyTorch embedding of the tokenized
-        contents.
+        associated index for the given file in the `self._metadata`
+        member, and the second element is a PyTorch embedding of the
+        tokenized contents.
         :rtype: list
         """
 
@@ -196,24 +200,16 @@ class LILADataset(Dataset):
 
         return tokenized_docs
 
-    def _chunk_tokens(self, tokenized_docs):
+    def _chnk_tokens(self, tokenized_docs):
         """
         Chunk tokenized documents.
 
         Break tokenized data into chunks with lengths
-        `self._chunk_length` - 2, before adding in special BERT [CLS] and
-        [SEP] tokens bringing the lenght to `self._chunk_length`.
-        Currently this method throws out final chunks if they are less than
-        `self._chunk_length` after adding special BERT [CLS] and [SEP]
-        tokens.
-
-        _NOTE_: This is a change from Ibrahim et al.
-        Since the input size of the model is 512 we're using it.
-        Ibrahim et al. used 256
-        I'm assuming they used this because most of the documentation assumes
-        usage as a cross-encoder (512 divided between two documents = 256
-        per document) rather than Siamese (giving the full 512 for each
-        instance).
+        `self._chnk_length` - 2, before adding in special BERT [CLS] and
+        [SEP] tokens bringing the lenght to `self._chnk_length`.
+        Currently this method throws out final chunks if they are less
+        than `self._chnk_length` after adding special BERT [CLS] and
+        [SEP] tokens.
 
         :param tokenized_docs: <Required> List of tuples, where the first
         tuple element is the associated index for the given file in the
@@ -222,17 +218,17 @@ class LILADataset(Dataset):
         :type tokenized_docs: list
 
         :returns: A list of tuples, where the first tuple element is the
-        associated index for the given file in the `self._metadata` member,
-        and the second element is a list of PyTorch embeddings of the chunks
-        generated from that file.
+        associated index for the given file in the `self._metadata`
+        member, and the second element is a list of PyTorch embeddings of
+        the chunks generated from that file.
         :rtype: list
         """
 
         # Our effective chunk size is two less to make room to add [CLS]
         # and [SEP] tokens back in to our resultant chunks
-        chunk_size_reduced = self._chunk_size - 2
+        chnk_size_reduced = self._chnk_size - 2
 
-        chunked_encodings = []
+        chnked_encodings = []
 
         for i, embedding in tokenized_docs:
             # Get num of tokens minues special BERT [CLS] and [SEP] tokens
@@ -246,9 +242,9 @@ class LILADataset(Dataset):
                                           1, 1, tokens_length)
 
             # Create bare chunks by slicing the tensor in strides of size
-            # chunk_size_reduced
-            chunks_input_ids = input_ids.split(chunk_size_reduced, dim=1)
-            chunks_attention_mask = attention_mask.split(chunk_size_reduced,
+            # chnk_size_reduced
+            chnks_input_ids = input_ids.split(chnk_size_reduced, dim=1)
+            chnks_attention_mask = attention_mask.split(chnk_size_reduced,
                                                          dim=1)
 
             # Create tensors for special tokens
@@ -260,46 +256,46 @@ class LILADataset(Dataset):
                                              device=attention_mask.device)
 
             # Process each chunk to add special tokens
-            processed_chunks = []
+            processed_chnks = []
 
-            for chunk_ids, chunk_mask in zip(chunks_input_ids,
-                                             chunks_attention_mask):
+            for chnk_ids, chnk_mask in zip(chnks_input_ids,
+                                           chnks_attention_mask):
                 # Add CLS token at start
-                chunk_ids = torch.cat([cls_token,
-                                       chunk_ids,
-                                       sep_token],
+                chnk_ids = torch.cat([cls_token,
+                                      chnk_ids,
+                                      sep_token],
                                       dim=1).to(self._device)
-                chunk_mask = torch.cat([special_attention,
-                                        chunk_mask,
-                                        special_attention],
+                chnk_mask = torch.cat([special_attention,
+                                       chnk_mask,
+                                       special_attention],
                                        dim=1).to(self._device)
 
                 # Pad final chunk if shorter than chunk size
-                short = self._chunk_size - chunk_ids.size(1)
+                short = self._chnk_size - chnk_ids.size(1)
                 if short > 0:
                     # # Adapted from:
                     # # https://pytorch.org/docs/stable/generated/torch.nn.functional.pad.html
-                    # chunk_ids = F.pad(chunk_ids,
+                    # chnk_ids = F.pad(chnk_ids,
                     #                   (0, short),
                     #                   "constant",
                     #                   0)  # effectively zero padding
-                    # chunk_mask = F.pad(chunk_mask,
+                    # chnk_mask = F.pad(chnk_mask,
                     #                    (0, short),
                     #                    "constant",
                     #                    0)  # effectively zero padding
                     # Throw away for now
                     continue
 
-                processed_chunks.append({
-                    'input_ids': chunk_ids,
-                    'attention_mask': chunk_mask
+                processed_chnks.append({
+                    'input_ids': chnk_ids,
+                    'attention_mask': chnk_mask
                 })
 
-            chunked_encodings.append((i, processed_chunks))
+            chnked_encodings.append((i, processed_chnks))
 
-        return chunked_encodings
+        return chnked_encodings
 
-    def _create_pairs(self, A_docs_chunked, notA_docs_chunked):
+    def _create_pairs(self, A_docs_chnked, notA_docs_chnked):
         """
         Create training pairs.
         Balance training pairs to 50% same-author and 50% different author
@@ -320,18 +316,18 @@ class LILADataset(Dataset):
         chunks within each genre or imposter-genre segment to randomize
         document representation.
 
-        :param A_docs_chunked: <Required> A list of tuples, where the first
+        :param A_docs_chnked: <Required> A list of tuples, where the first
         tuple element is the associated index for a given `A` (LaSalle) file
         in the `self._metadata` member, and the second element is a list of
         PyTorch embeddings of the chunks generated from that file.
-        :type A_docs_chunked: list
+        :type A_docs_chnked: list
 
-        :param notA_docs_chunked: <Required> A list of tuples, where the
+        :param notA_docs_chnked: <Required> A list of tuples, where the
         first tuple element is the associated index for a given `notA`
         (Imposter) file in the `self._metadata` member, and the second
         element is a list of PyTorch embeddings of the chunks generated from
         that file.
-        :type notA_docs_chunked: list
+        :type notA_docs_chnked: list
 
         :returns: A list of 3-tuples, where the first and second elements are
         PyTorch embeddings of chunks of either `A` or `notA` docs (both `A`
@@ -365,11 +361,11 @@ class LILADataset(Dataset):
                             for k in imposter_types}
 
         # Fill dicts with appropriate chunks
-        for (doc_idx, cnks) in A_docs_chunked:
+        for (doc_idx, cnks) in A_docs_chnked:
             doc_genre = meta_data.loc[doc_idx]['genre']
             A_cnks_by_genre[doc_genre].extend(cnks)
 
-        for (doc_idx, cnks) in notA_docs_chunked:
+        for (doc_idx, cnks) in notA_docs_chnked:
             doc_imposter_type = meta_data.loc[doc_idx]['imposter_for']
             doc_genre = meta_data.loc[doc_idx]['genre']
             notA_cnks_nested[doc_imposter_type][doc_genre].extend(cnks)
@@ -392,13 +388,13 @@ class LILADataset(Dataset):
         # Loop through genres
         for genre in genre_ratios:
             # Get the chunks for this genre
-            chunks = A_cnks_by_genre[genre]
+            chnks = A_cnks_by_genre[genre]
             # Determine how many pairs are needed in this given genre
             p_needed = round(n_same_pairs * genre_ratios[genre])
             # Since we're creating same pairs we need
             # the num of pairs X 2, chunks
             c_needed = p_needed * 2
-            c_have = len(chunks)
+            c_have = len(chnks)
             # Make sure we have enough
             assert (c_have >= c_needed), ("The requested number of same"
                                           " pairs requires more chunks"
@@ -408,9 +404,9 @@ class LILADataset(Dataset):
             # Randomly sample the needed chunks without replacement
             # Adapted from:
             # https://stackoverflow.com/a/6494519
-            chunks = random.Random(self._seed).sample(chunks, c_needed)
-            for i in range(0, len(chunks), 2):
-                same_auth_pairs.append((chunks[i], chunks[i+1], 1))
+            chnks = random.Random(self._seed).sample(chnks, c_needed)
+            for i in range(0, len(chnks), 2):
+                same_auth_pairs.append((chnks[i], chnks[i+1], 1))
 
         # Create negative pairs (different author)
         # preserving equal number of pairs between imposter types
@@ -421,9 +417,9 @@ class LILADataset(Dataset):
             # Loop through genres
             for genre in notA_cnks_nested[imposter]:
                 # Get the notA chunks for this genre and imposter type
-                notA_chunks = notA_cnks_nested[imposter][genre]
+                notA_chnks = notA_cnks_nested[imposter][genre]
                 # Get the A chunks for this genre
-                A_chunks = A_cnks_by_genre[genre]
+                A_chnks = A_cnks_by_genre[genre]
                 # Determine how many pairs are needed in this given
                 # genre per imposter split
                 p_needed = round(n_diff_pairs_by_imp_type *
@@ -432,8 +428,8 @@ class LILADataset(Dataset):
                 # notA chunks
                 c_notA_needed = p_needed
                 c_A_needed = p_needed
-                c_notA_have = len(notA_chunks)
-                c_A_have = len(A_chunks)
+                c_notA_have = len(notA_chnks)
+                c_A_have = len(A_chnks)
                 # Make sure we have enough
                 assert (c_A_have >= c_A_needed), ("The requested number of"
                                                   " diff pairs requires more"
@@ -452,12 +448,12 @@ class LILADataset(Dataset):
                 # Randomly sample the needed A and notA chunks without
                 # replacement Adapted from:
                 # https://stackoverflow.com/a/6494519
-                A_chunks = random.Random(self._seed).sample(A_chunks,
-                                                            c_A_needed)
-                notA_chunks = random.Random(self._seed).sample(notA_chunks,
-                                                               c_notA_needed)
-                for A_chunk, notA_chunk in zip(A_chunks, notA_chunks):
-                    diff_auth_pairs.append((A_chunk, notA_chunk, 0))
+                A_chnks = random.Random(self._seed).sample(A_chnks,
+                                                           c_A_needed)
+                notA_chnks = random.Random(self._seed).sample(notA_chnks,
+                                                              c_notA_needed)
+                for A_chnk, notA_chnk in zip(A_chnks, notA_chnks):
+                    diff_auth_pairs.append((A_chnk, notA_chnk, 0))
 
         # if rounding errors resulted in more pairs than needed, remove
         # the excess randomly
