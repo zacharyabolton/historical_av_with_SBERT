@@ -9,10 +9,9 @@ import os
 import sys
 import shutil
 import torch
-import torch.nn.functional as F
 import pandas as pd
 import numpy as np
-from constants import ROOT_DIR, LEARNING_RATE
+from constants import ROOT_DIR
 
 # Add src directory to sys.path
 # Adapted from Taras Alenin's answer on StackOverflow at:
@@ -29,7 +28,7 @@ class TestLILADataset:
     """
     A unified class to allow for easy setup and teardown of global and
     reused data and objects, and sharing of common methods. See
-    `setup_class`, `teardown_class`, `helper_test_chunking`.
+    `setup_class`, `teardown_class`, `helper_test_chnking`.
     """
     @classmethod
     def setup_class(cls):
@@ -162,12 +161,12 @@ class TestLILADataset:
 
         # Insantiate PyTorch dataset object with mock data
         # and toy parameters for testing
-        cls.chunk_size = 5
+        cls.chnk_size = 5
         cls.num_pairs = 10
         cls.seed = 1
         cls.ds = LILADataset(cls.undistorted_dir,
                              cls.test_metadata_path,
-                             chunk_size=cls.chunk_size,
+                             chnk_size=cls.chnk_size,
                              num_pairs=cls.num_pairs,
                              device=cls.device,
                              seed=cls.seed)
@@ -343,9 +342,9 @@ class TestLILADataset:
         assert At_ids != Ut_ids
         assert nAt_ids != Ut_ids
 
-    def helper_test_chunking(cls, docs_tokenized, docs_chnked):
+    def helper_test_chnking(cls, docs_tokenized, docs_chnked):
         """
-        A generalized routine for the `test_chunking` test.
+        A generalized routine for the `test_chnking` test.
         This routine does that actual work of testing the chunking
         mechanism in LILADataset. It is parameterized to allow testing for
         different class based collections of tokenized docs (A, U, notA).
@@ -368,7 +367,7 @@ class TestLILADataset:
         for i, (doc_idx, doc) in enumerate(docs_tokenized):
             ts = doc.input_ids[0, 1:-1]
             length = ts.size()[0]
-            chnk_len = cls.chunk_size - 2
+            chnk_len = cls.chnk_size - 2
             real_chnks = docs_chnked[i][1]
             # Create tensors for special tokens
             cls_token = torch.tensor([cls.ds.tokenizer.cls_token_id])
@@ -383,7 +382,7 @@ class TestLILADataset:
                 short = (chnk_len + 2) - expected_chnk_ids.size()[0]
                 if short > 0:
                     # # Adapted from:
-                    # # https://pytorch.org/docs/stable/generated/torch.nn.functional.pad.html
+                    # # https://pytorch.org/docs/stable/generated/torch.nn.functional.pad.html  # noqa: E501
                     # expected_chnk_ids = F.pad(expected_chnk_ids,
                     #                          (0, short),
                     #                          "constant",
@@ -397,23 +396,23 @@ class TestLILADataset:
                 # https://stackoverflow.com/a/54187453
                 assert torch.equal(real_chnk_ids, expected_chnk_ids)
 
-    def test_chunking(cls):
+    def test_chnking(cls):
         """
         This is a test of the chunking mechanism in the LILADataset. It
-        calls `helper_test_chunking()` method which does that actual
+        calls `helper_test_chnking()` method which does that actual
         end-testing.
         It also trivially checks for correct lengths of the collections.
         """
-        cls.helper_test_chunking(cls.ds._A_docs_tokenized,
-                                 cls.ds._A_docs_chunked)
-        cls.helper_test_chunking(cls.ds._U_docs_tokenized,
-                                 cls.ds._U_docs_chunked)
-        cls.helper_test_chunking(cls.ds._notA_docs_tokenized,
-                                 cls.ds._notA_docs_chunked)
+        cls.helper_test_chnking(cls.ds._A_docs_tokenized,
+                                cls.ds._A_docs_chnked)
+        cls.helper_test_chnking(cls.ds._U_docs_tokenized,
+                                cls.ds._U_docs_chnked)
+        cls.helper_test_chnking(cls.ds._notA_docs_tokenized,
+                                cls.ds._notA_docs_chnked)
 
-        assert len(cls.ds._A_docs_chunked) == 4
-        assert len(cls.ds._U_docs_chunked) == 4
-        assert len(cls.ds._notA_docs_chunked) == 4
+        assert len(cls.ds._A_docs_chnked) == 4
+        assert len(cls.ds._U_docs_chnked) == 4
+        assert len(cls.ds._notA_docs_chnked) == 4
 
     def test_pair_creation(cls):
         """
