@@ -47,7 +47,6 @@ import torch
 import torch.nn as nn
 from transformers import AutoModel
 
-
 class SiameseBERT(nn.Module):
     """
     A Siamese SBERT model based on the pre-trained all-MiniLM-L12-v2 model
@@ -70,6 +69,10 @@ class SiameseBERT(nn.Module):
 
         super(SiameseBERT, self).__init__()
         self.encoder = AutoModel.from_pretrained(model_name)
+
+        # Use DataParallel
+        if torch.cuda.device_count() > 1:
+            self.encoder = nn.DataParallel(self.encoder)
 
     def forward(self,
                 input_ids_a,
@@ -94,6 +97,20 @@ class SiameseBERT(nn.Module):
         :type attention_mask_a, attention_mask_b: torch.Tensor
         """
 
+        # # Encode both inputs in parallel
+        # outputs = self.encoder(
+        #     torch.cat([input_ids_a, input_ids_b]),
+        #     attention_mask=torch.cat([attention_mask_a, attention_mask_b])
+        # )
+
+        # # Split the outputs back
+        # batch_size = input_ids_a.size(0)
+        # embeddings = self.mean_pool(outputs.last_hidden_state,
+        #                             torch.cat([attention_mask_a,
+        #                                        attention_mask_b]))
+        # embeddings_a, embeddings_b = torch.split(embeddings, batch_size)
+
+        # return embeddings_a, embeddings_b
         # Encode first input
         outputs_a = self.encoder(input_ids_a,
                                  attention_mask=attention_mask_a)
@@ -167,7 +184,7 @@ class ContrastiveLoss(nn.Module):
     [31] ShairozS. 2021. losses.py. Gist 1a5e6953f0533cf19240ae1473eaedde. Retrieved November 4, 2024 from https://gist.github.com/ShairozS/1a5e6953f0533cf19240ae1473eaedde  # noqa E501
     """
 
-    def __init__(self, margin=1.0):
+    def __init__(self, margin=1.0, eps=1e-6):
         """
         Initializes the Contrastive Loss model
 
@@ -179,6 +196,7 @@ class ContrastiveLoss(nn.Module):
 
         super(ContrastiveLoss, self).__init__()
         self.margin = margin
+        self.eps = eps  # Small constant to prevent numerical instability
 
     def forward(self, u, v, label):
         """
@@ -192,8 +210,15 @@ class ContrastiveLoss(nn.Module):
         :type label: int (0 or 1)
         """
 
+        # Normalize embeddings
+        u_norm = u / (torch.norm(u, dim=1, keepdim=True) + self.eps)
+        v_norm = v / (torch.norm(v, dim=1, keepdim=True) + self.eps)
+
         # Calculate Euclidean distance
-        distance = torch.norm(u - v, dim=1)
+        distance = torch.norm(u_norm - v_norm, dim=1)
+
+        # Clamp distance for numerical stability
+        distance = torch.clamp(distance, min=self.eps)
 
         # Loss: Similar pairs should have low distance;
         # dissimilar should have high
@@ -203,7 +228,8 @@ class ContrastiveLoss(nn.Module):
         # When label = 0 (different author), the loss grows quadratically
         # the closer the pairs are, starting at `margin` where the loss is
         # zero.
-        loss = label * distance**2 + (1 - label) *\
-            torch.clamp(self.margin - distance, min=0)**2
+        positive_loss = label * distance.pow(2)
+        negative_loss = (1 - label) * torch.clamp(self.margin - distance, min=0).pow(2)
 
+        loss = positive_loss + negative_loss
         return torch.mean(loss)
