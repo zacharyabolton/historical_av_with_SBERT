@@ -3,7 +3,7 @@ Dataset functions and classes.
 
 Adapted for this project from the PyTorch (https://pytorch.org/)
 documentation at:
-https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files
+https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files  # noqa: E501
 """
 import random
 from torch.utils.data import Dataset
@@ -97,7 +97,7 @@ class LILADataset(Dataset):
         """
 
         assert (chnk_size > 2), ("Your chunk size is too small."
-                                  " Please increase.")
+                                 " Please increase.")
         assert (num_pairs % 2) == 0, ("Please use an even number of"
                                       " pairs for data balancing.")
 
@@ -245,7 +245,7 @@ class LILADataset(Dataset):
             # chnk_size_reduced
             chnks_input_ids = input_ids.split(chnk_size_reduced, dim=1)
             chnks_attention_mask = attention_mask.split(chnk_size_reduced,
-                                                         dim=1)
+                                                        dim=1)
 
             # Create tensors for special tokens
             cls_token = torch.tensor([[self.tokenizer.cls_token_id]],
@@ -264,17 +264,17 @@ class LILADataset(Dataset):
                 chnk_ids = torch.cat([cls_token,
                                       chnk_ids,
                                       sep_token],
-                                      dim=1).to(self._device)
+                                     dim=1).to(self._device)
                 chnk_mask = torch.cat([special_attention,
                                        chnk_mask,
                                        special_attention],
-                                       dim=1).to(self._device)
+                                      dim=1).to(self._device)
 
                 # Pad final chunk if shorter than chunk size
                 short = self._chnk_size - chnk_ids.size(1)
                 if short > 0:
                     # # Adapted from:
-                    # # https://pytorch.org/docs/stable/generated/torch.nn.functional.pad.html
+                    # # https://pytorch.org/docs/stable/generated/torch.nn.functional.pad.html  # noqa: E501
                     # chnk_ids = F.pad(chnk_ids,
                     #                   (0, short),
                     #                   "constant",
@@ -300,43 +300,44 @@ class LILADataset(Dataset):
         Create training pairs.
         Balance training pairs to 50% same-author and 50% different author
         pairs.
-        Within the same-author split, balance the distribution of chunks per
-        genre to be equal to the same genre distribution found in the source
-        dataset `A`.
+        Within the same-author split, balance the distribution of chunks
+        per genre to be equal to the same genre distribution found in the
+        source dataset `A`.
         Within the different-author split, balance so that there is equal
-        number of pairs for each imposter type ('LaSalle Imposters', 'George
-        Imposters').
+        number of pairs for each imposter type ('LaSalle Imposters',
+        'George Imposters').
         Within each imposter type subsplit, balance the distribution of
-        chunks per genre, per imposter type, to to be equal to the same genre
-        distribution found in the source dataset, `A`.
+        chunks per genre, per imposter type, to to be equal to the same
+        genre distribution found in the source dataset, `A`.
         _NOTE_: The returned list does not shuffle based on class
-        (same/different-author), genre, or imposter type, placing class 1 at
-        the start followed by class 0, and genres/imposter types partitioned
-        in the order they were encountered. It _does_ however, shuffle the
-        chunks within each genre or imposter-genre segment to randomize
-        document representation.
+        (same/different-author), genre, or imposter type, placing class 1
+        at the start followed by class 0, and genres/imposter types
+        partitioned in the order they were encountered. It _does_ however,
+        shuffle the chunks within each genre or imposter-genre segment to
+        randomize document representation.
 
         :param A_docs_chnked: <Required> A list of tuples, where the first
-        tuple element is the associated index for a given `A` (LaSalle) file
-        in the `self._metadata` member, and the second element is a list of
-        PyTorch embeddings of the chunks generated from that file.
+        tuple element is the associated index for a given `A` (LaSalle)
+        file in the `self._metadata` member, and the second element is a
+        list of PyTorch embeddings of the chunks generated from that file.
         :type A_docs_chnked: list
 
         :param notA_docs_chnked: <Required> A list of tuples, where the
         first tuple element is the associated index for a given `notA`
         (Imposter) file in the `self._metadata` member, and the second
-        element is a list of PyTorch embeddings of the chunks generated from
-        that file.
+        element is a list of PyTorch embeddings of the chunks generated
+        from that file.
         :type notA_docs_chnked: list
 
-        :returns: A list of 3-tuples, where the first and second elements are
-        PyTorch embeddings of chunks of either `A` or `notA` docs (both `A`
-        in the case of same-author pais, one `A` and one `notA` in the case
-        of different-author pairs). The third tuple element is a class label
-        of 1 (for same-author pairs) or 0 (for different-author pairs). The
-        first segment of the list, up to `n_same_pairs` (roughly half,
-        depending on rounding imprecision - see below) are all of class 1,
-        and the remaining segement are all of class 0.
+        :returns: A list of 3-tuples, where the first and second elements
+        are PyTorch embeddings of chunks of either `A` or `notA` docs
+        (both `A` in the case of same-author pais, one `A` and one `notA`
+        in the case of different-author pairs). The third tuple element is
+        a class label of 1 (for same-author pairs) or 0 (for
+        different-author pairs). The first segment of the list, up to
+        `n_same_pairs` (roughly half, depending on rounding imprecision
+        - see below) are all of class 1, and the remaining segement are
+        all of class 0.
         :rtype: list
         """
         # Save metadata locally for shorter code lines and readability
@@ -379,7 +380,8 @@ class LILADataset(Dataset):
         # When unable to balance perfectly we give the difference to the
         # different-author pairs
         n_imp_types = len(notA_cnks_nested.keys())
-        n_diff_pairs_by_imp_type = math.ceil((self._num_pairs/2)/n_imp_types)
+        n_diff_pairs_by_imp_type = math.ceil((self._num_pairs/2) /
+                                             n_imp_types)
         n_diff_pairs_total = n_diff_pairs_by_imp_type * n_imp_types
         n_same_pairs = self._num_pairs - n_diff_pairs_total
 
@@ -390,21 +392,21 @@ class LILADataset(Dataset):
             # Get the chunks for this genre
             chnks = A_cnks_by_genre[genre]
             # Determine how many pairs are needed in this given genre
-            p_needed = round(n_same_pairs * genre_ratios[genre])
+            p_need = round(n_same_pairs * genre_ratios[genre])
             # Since we're creating same pairs we need
             # the num of pairs X 2, chunks
-            c_needed = p_needed * 2
+            c_need = p_need * 2
             c_have = len(chnks)
             # Make sure we have enough
-            assert (c_have >= c_needed), ("The requested number of same"
-                                          " pairs requires more chunks"
-                                          " than can be generated from"
-                                          f" this population: {c_have}"
-                                          f" < {c_needed}")
+            assert (c_have >= c_need), ("The requested number of same"
+                                        " pairs requires more chunks than"
+                                        " can be generated from this"
+                                        f" population: {c_have} < "
+                                        f"{c_need}")
             # Randomly sample the needed chunks without replacement
             # Adapted from:
             # https://stackoverflow.com/a/6494519
-            chnks = random.Random(self._seed).sample(chnks, c_needed)
+            chnks = random.Random(self._seed).sample(chnks, c_need)
             for i in range(0, len(chnks), 2):
                 same_auth_pairs.append((chnks[i], chnks[i+1], 1))
 
@@ -422,36 +424,38 @@ class LILADataset(Dataset):
                 A_chnks = A_cnks_by_genre[genre]
                 # Determine how many pairs are needed in this given
                 # genre per imposter split
-                p_needed = round(n_diff_pairs_by_imp_type *
-                                 genre_ratios[genre])
+                p_need = round(n_diff_pairs_by_imp_type *
+                               genre_ratios[genre])
                 # Since we're creating diff pairs we need 50% A and 50%
                 # notA chunks
-                c_notA_needed = p_needed
-                c_A_needed = p_needed
+                c_notA_need = p_need
+                c_A_need = p_need
                 c_notA_have = len(notA_chnks)
                 c_A_have = len(A_chnks)
                 # Make sure we have enough
-                assert (c_A_have >= c_A_needed), ("The requested number of"
-                                                  " diff pairs requires more"
-                                                  " A chunks than can be"
-                                                  " generated from this"
-                                                  f" population: {c_A_have}"
-                                                  f" < {c_A_needed}")
-                assert (c_notA_have >= c_notA_needed), ("The requested number"
-                                                        " of diff pairs"
-                                                        " requires more notA"
-                                                        " chunks than can be"
-                                                        " generated from this"
-                                                        " population:"
-                                                        f" {c_notA_have}"
-                                                        f" < {c_notA_needed}")
+                assert (c_A_have >= c_A_need), ("The requested number of"
+                                                " diff pairs requires"
+                                                " more A chunks than can"
+                                                " be generated from this"
+                                                " population:"
+                                                f" {c_A_have} <"
+                                                f" {c_A_need}")
+                assert (c_notA_have >= c_notA_need), ("The requested"
+                                                      " number of diff"
+                                                      " pairs requires"
+                                                      " more notA chunks"
+                                                      " than can be"
+                                                      " generated from"
+                                                      " this population:"
+                                                      f" {c_notA_have} < "
+                                                      f"{c_notA_need}")
                 # Randomly sample the needed A and notA chunks without
                 # replacement Adapted from:
                 # https://stackoverflow.com/a/6494519
                 A_chnks = random.Random(self._seed).sample(A_chnks,
-                                                           c_A_needed)
+                                                           c_A_need)
                 notA_chnks = random.Random(self._seed).sample(notA_chnks,
-                                                              c_notA_needed)
+                                                              c_notA_need)
                 for A_chnk, notA_chnk in zip(A_chnks, notA_chnks):
                     diff_auth_pairs.append((A_chnk, notA_chnk, 0))
 
