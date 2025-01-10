@@ -163,4 +163,5 @@ cython_debug/
 
 /tutorials
 src/prototype_debug.py
-.virtual_documents
+*.virtual_documents
+*.DS_Store
