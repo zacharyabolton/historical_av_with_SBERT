@@ -28,7 +28,7 @@ class TestLILADataset:
     """
     A unified class to allow for easy setup and teardown of global and
     reused data and objects, and sharing of common methods. See
-    `setup_class`, `teardown_class`, `helper_test_chnking`.
+    `setup_class`, `teardown_class`, `helper_test_cnking`.
     """
     @classmethod
     def setup_class(cls):
@@ -37,7 +37,7 @@ class TestLILADataset:
 
         """
         # Create a mock dataset that can test some edge cases
-        # Dataset characteristics:
+        # Dataset characteristics (minus omitted work `A-4.txt`):
         #     Word Frequencies:
         #     - elit:        1
         #     - adipiscing:  2
@@ -58,6 +58,7 @@ class TestLILADataset:
             'consectetur lorem',                                # A-1
             '42 adipiscing ipsum 42 s9t amet',                  # A-2
             'adipiscing elit amet',                             # A-3
+            'NONE OF THIS SHOULD SHOW UP',                      # A-4
             'lorem 42 consectetur amet consectetur amet s9t',   # U-0
             'lorem',                                            # U-1
             '42 ipsum s9t',                                     # U-2
@@ -80,7 +81,6 @@ class TestLILADataset:
                             'omit',
                             'num_words']
         df_TEST_metadata = pd.DataFrame(columns=metadata_columns)
-        print(cls.dataset)
         rows = [['A-0.txt', 'aauth', 'A author', 'mock genre 1',
                  None, 'A', 1, False, len(cls.dataset[0].split())],
                 ['A-1.txt', 'aauth', 'A author', 'mock genre 1',
@@ -89,28 +89,30 @@ class TestLILADataset:
                  None, 'A', 1, False, len(cls.dataset[2].split())],
                 ['A-3.txt', 'aauth', 'A author', 'mock genre 2',
                  None, 'A', 1, False, len(cls.dataset[3].split())],
+                ['A-4.txt', 'aauth', 'A author', 'mock genre 2',
+                 None, 'A', 1, True, len(cls.dataset[4].split())],
 
                 ['U-0.txt', None, None, 'mock genre 3',
-                 None, 'U', None, False, len(cls.dataset[4].split())],
-                ['U-1.txt', None, None, 'mock genre 3',
                  None, 'U', None, False, len(cls.dataset[5].split())],
-                ['U-2.txt', None, None, 'mock genre 3',
+                ['U-1.txt', None, None, 'mock genre 3',
                  None, 'U', None, False, len(cls.dataset[6].split())],
-                ['U-3.txt', None, None, 'mock genre 3',
+                ['U-2.txt', None, None, 'mock genre 3',
                  None, 'U', None, False, len(cls.dataset[7].split())],
+                ['U-3.txt', None, None, 'mock genre 3',
+                 None, 'U', None, False, len(cls.dataset[8].split())],
 
                 ['notA-0.txt', 'naauth', 'Imposter author',
                  'mock genre 1', 'John', 'notA', 0, False,
-                 len(cls.dataset[8].split())],
+                 len(cls.dataset[9].split())],
                 ['notA-1.txt', 'naauth', 'Imposter author',
                  'mock genre 2', 'John', 'notA', 0, False,
-                 len(cls.dataset[9].split())],
+                 len(cls.dataset[10].split())],
                 ['notA-2.txt', 'naauth', 'Imposter author',
                  'mock genre 1', 'Jane', 'notA', 0, False,
-                 len(cls.dataset[10].split())],
+                 len(cls.dataset[11].split())],
                 ['notA-3.txt', 'naauth', 'Imposter author',
                  'mock genre 2', 'Jane', 'notA', 0, False,
-                 len(cls.dataset[11].split())]]
+                 len(cls.dataset[12].split())]]
         for row in rows:
             df_TEST_metadata.loc[len(df_TEST_metadata)] = row
 
@@ -142,16 +144,21 @@ class TestLILADataset:
         os.mkdir(U_dir)
 
         # Write mock data to appropriate files
-        num_files = 4
         canonical_class_labels = sorted(os.listdir(cls.undistorted_dir))
+        rows_idx = 0
         for i, canonical_class in enumerate(canonical_class_labels):
+            num_files = sum([1 for i
+                             in rows
+                             if i[5] == canonical_class])
             for j, test_file in enumerate(range(num_files)):
-                file_name = f"{canonical_class}-{test_file}.txt"
-                file_path = os.path.join(cls.undistorted_dir,
-                                         canonical_class,
-                                         file_name)
-                with open(file_path, 'w') as f:
-                    f.write(cls.dataset[i * num_files + j])
+                if rows[rows_idx + j][7] is not True:
+                    file_name = f"{canonical_class}-{test_file}.txt"
+                    file_path = os.path.join(cls.undistorted_dir,
+                                             canonical_class,
+                                             file_name)
+                    with open(file_path, 'w') as f:
+                        f.write(cls.dataset[rows_idx + j])
+            rows_idx += num_files
 
         # Send all Tensor operations to mps if available, and cpu if not
         # TODO: Get this to work on GPU systems as well (CUDA)
@@ -161,12 +168,12 @@ class TestLILADataset:
 
         # Insantiate PyTorch dataset object with mock data
         # and toy parameters for testing
-        cls.chnk_size = 5
+        cls.cnk_size = 5
         cls.num_pairs = 10
         cls.seed = 1
         cls.ds = LILADataset(cls.undistorted_dir,
                              cls.test_metadata_path,
-                             chnk_size=cls.chnk_size,
+                             cnk_size=cls.cnk_size,
                              num_pairs=cls.num_pairs,
                              device=cls.device,
                              seed=cls.seed)
@@ -184,6 +191,7 @@ class TestLILADataset:
         """
         Trivial test to ensure LILADataset can instantiate
         """
+
         assert isinstance(cls.ds, LILADataset)
 
     def test_metadata_exists(cls):
@@ -342,9 +350,9 @@ class TestLILADataset:
         assert At_ids != Ut_ids
         assert nAt_ids != Ut_ids
 
-    def helper_test_chnking(cls, docs_tokenized, docs_chnked):
+    def helper_test_cnking(cls, docs_tokenized, docs_cnked):
         """
-        A generalized routine for the `test_chnking` test.
+        A generalized routine for the `test_cnking` test.
         This routine does that actual work of testing the chunking
         mechanism in LILADataset. It is parameterized to allow testing for
         different class based collections of tokenized docs (A, U, notA).
@@ -356,63 +364,63 @@ class TestLILADataset:
         second element is a PyTorch embedding of the tokenized contents.
         :type docs_tokenized: list
 
-        :param docs_chnked: <Required> The actual collection of chunked
+        :param docs_cnked: <Required> The actual collection of chunked
         and tokenized documents belonging to the LILADataset (A, U, notA).
         A list of tuples, where the first tuple element is the associated
         index for a given file in the `LILADataset._metadata` member, and
         the second element is a list of PyTorch embeddings of the chunks
         generated from that file.
-        :type A_docs_chnked: list
+        :type A_docs_cnked: list
         """
         for i, (doc_idx, doc) in enumerate(docs_tokenized):
             ts = doc.input_ids[0, 1:-1]
             length = ts.size()[0]
-            chnk_len = cls.chnk_size - 2
-            real_chnks = docs_chnked[i][1]
+            cnk_len = cls.cnk_size - 2
+            real_cnks = docs_cnked[i][1]
             # Create tensors for special tokens
             cls_token = torch.tensor([cls.ds.tokenizer.cls_token_id])
             sep_token = torch.tensor([cls.ds.tokenizer.sep_token_id])
-            for chnk_start in range(0, length, chnk_len):
-                expected_chnk_ids = ts[chnk_start:chnk_start + chnk_len]
+            for cnk_start in range(0, length, cnk_len):
+                expected_cnk_ids = ts[cnk_start:cnk_start + cnk_len]
                 # Add CLS token at start
-                expected_chnk_ids = torch.cat([cls_token,
-                                                expected_chnk_ids,
-                                                sep_token],
-                                               dim=0).to(cls.device)
-                short = (chnk_len + 2) - expected_chnk_ids.size()[0]
+                expected_cnk_ids = torch.cat([cls_token,
+                                              expected_cnk_ids,
+                                              sep_token],
+                                             dim=0).to(cls.device)
+                short = (cnk_len + 2) - expected_cnk_ids.size()[0]
                 if short > 0:
                     # # Adapted from:
                     # # https://pytorch.org/docs/stable/generated/torch.nn.functional.pad.html  # noqa: E501
-                    # expected_chnk_ids = F.pad(expected_chnk_ids,
+                    # expected_cnk_ids = F.pad(expected_cnk_ids,
                     #                          (0, short),
                     #                          "constant",
                     #                          0)  # effectively 0 padding
                     # Throw away for now
                     continue
-                expected_chnk_ids = expected_chnk_ids.unsqueeze(dim=0)
-                real_chnk_index = int(chnk_start/chnk_len)
-                real_chnk_ids = real_chnks[real_chnk_index]['input_ids']
+                expected_cnk_ids = expected_cnk_ids.unsqueeze(dim=0)
+                real_cnk_index = int(cnk_start/cnk_len)
+                real_cnk_ids = real_cnks[real_cnk_index]['input_ids']
                 # Adapted from:
                 # https://stackoverflow.com/a/54187453
-                assert torch.equal(real_chnk_ids, expected_chnk_ids)
+                assert torch.equal(real_cnk_ids, expected_cnk_ids)
 
-    def test_chnking(cls):
+    def test_cnking(cls):
         """
         This is a test of the chunking mechanism in the LILADataset. It
-        calls `helper_test_chnking()` method which does that actual
+        calls `helper_test_cnking()` method which does that actual
         end-testing.
         It also trivially checks for correct lengths of the collections.
         """
-        cls.helper_test_chnking(cls.ds._A_docs_tokenized,
-                                cls.ds._A_docs_chnked)
-        cls.helper_test_chnking(cls.ds._U_docs_tokenized,
-                                cls.ds._U_docs_chnked)
-        cls.helper_test_chnking(cls.ds._notA_docs_tokenized,
-                                cls.ds._notA_docs_chnked)
+        cls.helper_test_cnking(cls.ds._A_docs_tokenized,
+                               cls.ds._A_docs_cnked)
+        cls.helper_test_cnking(cls.ds._U_docs_tokenized,
+                               cls.ds._U_docs_cnked)
+        cls.helper_test_cnking(cls.ds._notA_docs_tokenized,
+                               cls.ds._notA_docs_cnked)
 
-        assert len(cls.ds._A_docs_chnked) == 4
-        assert len(cls.ds._U_docs_chnked) == 4
-        assert len(cls.ds._notA_docs_chnked) == 4
+        assert len(cls.ds._A_docs_cnked) == 4
+        assert len(cls.ds._U_docs_cnked) == 4
+        assert len(cls.ds._notA_docs_cnked) == 4
 
     def test_pair_creation(cls):
         """
