@@ -2,14 +2,13 @@
 This test suite tests this project's implementaion of the abstract PyTorch
 `Dataset` class.
 
-https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files
+https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files  # noqa: E501
 """
 import math
 import os
 import sys
 import shutil
 import torch
-import pandas as pd
 import numpy as np
 from constants import ROOT_DIR
 
@@ -22,6 +21,7 @@ if src_path not in sys.path:
 
 # Import custom modules
 from lila_dataset import LILADataset  # noqa: E402
+from generate_test_data import generate_test_data, destroy_test_data  # noqa: E402
 
 
 class TestLILADataset:
@@ -34,131 +34,15 @@ class TestLILADataset:
     def setup_class(cls):
         """
         Setup global and reused test data and objects.
-
         """
-        # Create a mock dataset that can test some edge cases
-        # Dataset characteristics (minus omitted work `A-4.txt`):
-        #     Word Frequencies:
-        #     - elit:        1
-        #     - adipiscing:  2
-        #     - consectetur: 3
-        #     - amet:        4
-        #     - s9t:         5
-        #     - 42:          6
-        #     - ipsum:       7
-        #     - lorem:       8
-        #     - foo:         24
-        #     Vocab size: 9
-        #     Num words: 60
-        #     Average doc length: 5
-        #     Shortest doc: 1
-        #     Longest doc: 15
-        cls.dataset = [
-            'lorem ipsum',                                      # A-0
-            'consectetur lorem',                                # A-1
-            '42 adipiscing ipsum 42 s9t amet',                  # A-2
-            'adipiscing elit amet',                             # A-3
-            'NONE OF THIS SHOULD SHOW UP',                      # A-4
-            'lorem 42 consectetur amet consectetur amet s9t',   # U-0
-            'lorem',                                            # U-1
-            '42 ipsum s9t',                                     # U-2
-            'ipsum lorem',                                      # U-3
-            '42 42 lorem s9t foo foo foo foo foo foo foo foo',  # notA-0
-            'ipsum lorem s9t foo',                              # notA-1
-            'ipsum ipsum foo foo foo foo foo foo foo foo foo'
-            ' foo foo foo foo',                                 # notA-2
-            'lorem foo foo'                                     # notA-3
-        ]
 
-        # Create a mock metadata table
-        metadata_columns = ['file',
-                            'author_short',
-                            'author',
-                            'genre',
-                            'imposter_for',
-                            'canonical_class_label',
-                            'class',
-                            'omit',
-                            'num_words']
-        df_TEST_metadata = pd.DataFrame(columns=metadata_columns)
-        rows = [['A-0.txt', 'aauth', 'A author', 'mock genre 1',
-                 None, 'A', 1, False, len(cls.dataset[0].split())],
-                ['A-1.txt', 'aauth', 'A author', 'mock genre 1',
-                 None, 'A', 1, False, len(cls.dataset[1].split())],
-                ['A-2.txt', 'aauth', 'A author', 'mock genre 1',
-                 None, 'A', 1, False, len(cls.dataset[2].split())],
-                ['A-3.txt', 'aauth', 'A author', 'mock genre 2',
-                 None, 'A', 1, False, len(cls.dataset[3].split())],
-                ['A-4.txt', 'aauth', 'A author', 'mock genre 2',
-                 None, 'A', 1, True, len(cls.dataset[4].split())],
+        # Set name of directory where all test data for this test run will
+        # be placed.
+        cls.test_data_directory = 'pytorch_ds_test_dir'
 
-                ['U-0.txt', None, None, 'mock genre 3',
-                 None, 'U', None, False, len(cls.dataset[5].split())],
-                ['U-1.txt', None, None, 'mock genre 3',
-                 None, 'U', None, False, len(cls.dataset[6].split())],
-                ['U-2.txt', None, None, 'mock genre 3',
-                 None, 'U', None, False, len(cls.dataset[7].split())],
-                ['U-3.txt', None, None, 'mock genre 3',
-                 None, 'U', None, False, len(cls.dataset[8].split())],
-
-                ['notA-0.txt', 'naauth', 'Imposter author',
-                 'mock genre 1', 'John', 'notA', 0, False,
-                 len(cls.dataset[9].split())],
-                ['notA-1.txt', 'naauth', 'Imposter author',
-                 'mock genre 2', 'John', 'notA', 0, False,
-                 len(cls.dataset[10].split())],
-                ['notA-2.txt', 'naauth', 'Imposter author',
-                 'mock genre 1', 'Jane', 'notA', 0, False,
-                 len(cls.dataset[11].split())],
-                ['notA-3.txt', 'naauth', 'Imposter author',
-                 'mock genre 2', 'Jane', 'notA', 0, False,
-                 len(cls.dataset[12].split())]]
-        for row in rows:
-            df_TEST_metadata.loc[len(df_TEST_metadata)] = row
-
-        # Create test data tree and save dataset and metadata table within
-        data_dir = '../data'
-        test_dir = os.path.join(data_dir, 'test')
-        cls.pytorch_ds_test_dir = os.path.join(test_dir,
-                                               'distortion_test_data')
-        # Delete the whole tree just in case the `teardown_class` was
-        # toggled off during testing
-        # Adapted from: https://stackoverflow.com/a/13118112
-        shutil.rmtree(cls.pytorch_ds_test_dir, ignore_errors=True)
-        os.mkdir(cls.pytorch_ds_test_dir)
-        # Create a mock source directory
-        cls.undistorted_dir = os.path.join(cls.pytorch_ds_test_dir,
-                                           'undistorted')
-        os.mkdir(cls.undistorted_dir)
-        # Create the file path to the metadata
-        cls.test_metadata_path = os.path.join(cls.pytorch_ds_test_dir,
-                                              'metadata.csv')
-        # Save the metadata
-        df_TEST_metadata.to_csv(cls.test_metadata_path, index=False)
-        # Create mock sub-directories
-        A_dir = os.path.join(cls.undistorted_dir, 'A')
-        notA_dir = os.path.join(cls.undistorted_dir, 'notA')
-        U_dir = os.path.join(cls.undistorted_dir, 'U')
-        os.mkdir(A_dir)
-        os.mkdir(notA_dir)
-        os.mkdir(U_dir)
-
-        # Write mock data to appropriate files
-        canonical_class_labels = sorted(os.listdir(cls.undistorted_dir))
-        rows_idx = 0
-        for i, canonical_class in enumerate(canonical_class_labels):
-            num_files = sum([1 for i
-                             in rows
-                             if i[5] == canonical_class])
-            for j, test_file in enumerate(range(num_files)):
-                if rows[rows_idx + j][7] is not True:
-                    file_name = f"{canonical_class}-{test_file}.txt"
-                    file_path = os.path.join(cls.undistorted_dir,
-                                             canonical_class,
-                                             file_name)
-                    with open(file_path, 'w') as f:
-                        f.write(cls.dataset[rows_idx + j])
-            rows_idx += num_files
+        # Generate the test data and relevent paths
+        cls.dataset, cls.paths = generate_test_data(
+            cls.test_data_directory)
 
         # Send all Tensor operations to mps if available, and cpu if not
         # TODO: Get this to work on GPU systems as well (CUDA)
@@ -171,8 +55,8 @@ class TestLILADataset:
         cls.cnk_size = 5
         cls.num_pairs = 10
         cls.seed = 1
-        cls.ds = LILADataset(cls.undistorted_dir,
-                             cls.test_metadata_path,
+        cls.ds = LILADataset(cls.paths['undistorted_dir'],
+                             cls.paths['test_metadata_path'],
                              cnk_size=cls.cnk_size,
                              num_pairs=cls.num_pairs,
                              device=cls.device,
@@ -185,7 +69,7 @@ class TestLILADataset:
         """
 
         # Remove everything after tests have run
-        shutil.rmtree(cls.pytorch_ds_test_dir, ignore_errors=True)
+        destroy_test_data(cls.test_data_directory)
 
     def test_dataset_exists(cls):
         """
@@ -198,7 +82,7 @@ class TestLILADataset:
         """
         Trivial test to ensure the metadata file was created
         """
-        assert os.path.exists(cls.test_metadata_path)
+        assert os.path.exists(cls.paths['test_metadata_path'])
 
     def test_dataset_subdirs_exist(cls):
         """
