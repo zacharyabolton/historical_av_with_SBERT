@@ -7,7 +7,6 @@ https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-cust
 import math
 import os
 import sys
-import shutil
 import torch
 import numpy as np
 from constants import ROOT_DIR
@@ -35,14 +34,88 @@ class TestLILADataset:
         """
         Setup global and reused test data and objects.
         """
+        # Create a mock dataset that can test some edge cases
+        # Dataset characteristics (minus omitted work `A-4.txt`):
+        #     Word Frequencies:
+        #     - elit:        1
+        #     - adipiscing:  2
+        #     - consectetur: 3
+        #     - amet:        4
+        #     - s9t:         5
+        #     - 42:          6
+        #     - ipsum:       7
+        #     - lorem:       8
+        #     - foo:         24
+        #     Vocab size: 9
+        #     Num words: 60
+        #     Average doc length: 5
+        #     Shortest doc: 1
+        #     Longest doc: 15
+        cls.dataset = [
+            'lorem ipsum',                                      # A-0
+            'consectetur lorem',                                # A-1
+            '42 adipiscing ipsum 42 s9t amet',                  # A-2
+            'adipiscing elit amet',                             # A-3
+            'NONE OF THIS SHOULD SHOW UP',                      # A-4
+            'lorem 42 consectetur amet consectetur amet s9t',   # U-0
+            'lorem',                                            # U-1
+            '42 ipsum s9t',                                     # U-2
+            'ipsum lorem',                                      # U-3
+            '42 42 lorem s9t foo foo foo foo foo foo foo foo',  # notA-0
+            'ipsum lorem s9t foo',                              # notA-1
+            'ipsum ipsum foo foo foo foo foo foo foo foo foo'
+            ' foo foo foo foo',                                 # notA-2
+            'lorem foo foo'                                     # notA-3
+        ]
+        cls.metadata_rows = [['A-0.txt', 'aauth', 'A author',
+                              'mock genre 1', None, 'A', 1, False,
+                              len(cls.dataset[0].split())],
+                             ['A-1.txt', 'aauth', 'A author',
+                              'mock genre 1', None, 'A', 1, False,
+                              len(cls.dataset[1].split())],
+                             ['A-2.txt', 'aauth', 'A author',
+                              'mock genre 1', None, 'A', 1, False,
+                              len(cls.dataset[2].split())],
+                             ['A-3.txt', 'aauth', 'A author',
+                              'mock genre 2', None, 'A', 1, False,
+                              len(cls.dataset[3].split())],
+                             ['A-4.txt', 'aauth', 'A author',
+                              'mock genre 2', None, 'A', 1, True,
+                              len(cls.dataset[4].split())],
+
+                             ['U-0.txt', None, None, 'mock genre 3',
+                              None, 'U', None, False,
+                              len(cls.dataset[5].split())],
+                             ['U-1.txt', None, None, 'mock genre 3',
+                              None, 'U', None, False,
+                              len(cls.dataset[6].split())],
+                             ['U-2.txt', None, None, 'mock genre 3',
+                              None, 'U', None, False,
+                              len(cls.dataset[7].split())],
+                             ['U-3.txt', None, None, 'mock genre 3',
+                              None, 'U', None, False,
+                              len(cls.dataset[8].split())],
+
+                             ['notA-0.txt', 'naauth', 'Imposter author',
+                              'mock genre 1', 'John', 'notA', 0, False,
+                              len(cls.dataset[9].split())],
+                             ['notA-1.txt', 'naauth', 'Imposter author',
+                              'mock genre 2', 'John', 'notA', 0, False,
+                              len(cls.dataset[10].split())],
+                             ['notA-2.txt', 'naauth', 'Imposter author',
+                              'mock genre 1', 'Jane', 'notA', 0, False,
+                              len(cls.dataset[11].split())],
+                             ['notA-3.txt', 'naauth', 'Imposter author',
+                              'mock genre 2', 'Jane', 'notA', 0, False,
+                              len(cls.dataset[12].split())]]
 
         # Set name of directory where all test data for this test run will
         # be placed.
         cls.test_data_directory = 'pytorch_ds_test_dir'
 
         # Generate the test data and relevent paths
-        cls.dataset, cls.paths = generate_test_data(
-            cls.test_data_directory)
+        cls.paths, cls.canonical_class_labels = generate_test_data(
+            cls.test_data_directory, cls.dataset, cls.metadata_rows)
 
         # Send all Tensor operations to mps if available, and cpu if not
         # TODO: Get this to work on GPU systems as well (CUDA)

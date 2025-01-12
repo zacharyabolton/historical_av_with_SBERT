@@ -9,8 +9,8 @@ https://gist.github.com/zacharyabolton/34bd09f76f94111ac0113fb5da1ea14e
 This preserves comparibility to this precursor study, as well as reduces
 noise introduced by OCR in some of the collected works.
 
-This routine converts all text to lowercase and removes all non-alphanumeric
-characters.
+This routine converts all text to lowercase and removes all
+non-alphanumeric characters.
 """
 import os
 import re
@@ -32,9 +32,10 @@ def remove_non_alphanum_symbols(input_string):
     return ' '.join(alpha_string.split())
 
 
-def normalize(data_dir, canonical_class_labels):
+def normalize_text(data_dir, canonical_class_labels):
     """
-    Lowercase and remove all non-alphanumeric characters from an input text.
+    Lowercase and remove all non-alphanumeric characters from an input
+    text.
 
     :param data_dir: The relative path to the directory containing class
     based sub-directories for the input data corpus.
@@ -48,16 +49,20 @@ def normalize(data_dir, canonical_class_labels):
     normalized_dir = os.path.join(data_dir, 'normalized')
     os.makedirs(normalized_dir, exist_ok=True)
 
+    # Create new directory for undistorted text
+    undistorted_dir = os.path.join(normalized_dir, 'undistorted')
+    os.makedirs(undistorted_dir, exist_ok=True)
+
     # Set the path to the original undistorted data
-    data_dir = os.path.join(data_dir, 'cleaned')
+    cleaned_dir = os.path.join(data_dir, 'cleaned')
 
     # Loop through the sub-directories to collect samples in each input
     # class.
     for label in canonical_class_labels:
         # Create the path to the class samples.
-        class_dir = os.path.join(data_dir, label)
+        class_dir = os.path.join(cleaned_dir, label)
         # Create an output path to the normalized class samples
-        normalized_class_dir = os.path.join(normalized_dir, label)
+        normalized_class_dir = os.path.join(undistorted_dir, label)
         os.makedirs(normalized_class_dir, exist_ok=True)
         # Loop through each file in the class directory.
         for file in os.listdir(class_dir):
@@ -72,8 +77,8 @@ def normalize(data_dir, canonical_class_labels):
                     # Remove all non-alphanumeric characters
                     text = remove_non_alphanum_symbols(text)
                     # Create path to new normalized file
-                    normalized_text_file = os.path.join(normalized_class_dir,
-                                                        file)
+                    normalized_text_file = os.path.\
+                        join(normalized_class_dir, file)
                     # Save new normalized files
                     with open(normalized_text_file, 'w') as f:
                         f.write(text)
@@ -86,7 +91,7 @@ def run_normalizer(args):
     assert type(data_dir), 'str'
     assert type(canonical_class_names), 'list'
 
-    normalize(data_dir, canonical_class_names)
+    normalize_text(data_dir, canonical_class_names)
 
 
 if __name__ == '__main__':
@@ -101,7 +106,8 @@ if __name__ == '__main__':
     parser.add_argument('-d',
                         '--data_dir',
                         type=str,
-                        help='<Required> The relative path to the data root',
+                        help=('<Required> The relative path to the data'
+                              ' root'),
                         required=True)
 
     # Set the class conical names
@@ -110,7 +116,8 @@ if __name__ == '__main__':
                         '--canonical_class_names',
                         type=str,
                         nargs='+',
-                        help='<Required> Names of class based subdirectories',
+                        help=('<Required> Names of class based'
+                              ' subdirectories'),
                         required=True)
 
     args = parser.parse_args()

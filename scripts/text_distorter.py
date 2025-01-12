@@ -3,31 +3,31 @@ Loop through each document in the corpus and distort it with both DV-MA,
 and DV-SA using two values of K resulting in 4 new versions of each
 document.
 The results should be a directory structure similar to the input
-`data_directory` stored in subdirectores with the following naming pattern:
+`data_directory` stored in subdirectores with the following naming
+pattern:
 "/DV-<MA | SA>-k-<{k}>/"
 E.g. If `k` values of 300, and 3000, the directory for the output
 relative to the input path, should be:
-..
-├── DV-MA-k-300/
-│   ├── A
-│   │   ├── text1.txt
-│   │   ├── text2.txt
-│   │   ├── text3.txt
-│   │   └── ...
-│   ├── notA
-│   │   └── ...
-│   └── U
-│       └── ...
-├── DV-MA-k-3000/
-│   └── ...
-├── DV-SA-k-300/
-│   └── ...
-└── DV-SA-k-3000/
-    └── ...
-Note the `..` at the head, indicating the following structure should be
-rooted one level above the input path. E.g. if the input data path is
-`../data/test/undistorted` the structure should be rooted at
-`../data/test`.
+./normalized
+  ├── DV-MA-k-300/
+  │   ├── A
+  │   │   ├── text1.txt
+  │   │   ├── text2.txt
+  │   │   ├── text3.txt
+  │   │   └── ...
+  │   ├── notA
+  │   │   └── ...
+  │   └── U
+  │       └── ...
+  ├── DV-MA-k-3000/
+  │   └── ...
+  ├── DV-SA-k-300/
+  │   └── ...
+  └── DV-SA-k-3000/
+      └── ...
+Note the `./` at the head, indicating the following structure should be
+rooted at the same level as the input path. E.g. if the input data path is
+`../data/test` the structure should be rooted at `../data/test`.
 """
 from nltk.probability import FreqDist
 import os
@@ -46,23 +46,24 @@ def get_W_k(data_dir, canonical_class_labels, k):
     :param canonical_class_labels: A list of strings representing the
     subdiretories named after thier respective canonical class names.
     :type canonical_class_labels: list
-    :param k: The number of most frequent words to retrieve from the corpus.
+    :param k: The number of most frequent words to retrieve from the
+    corpus.
     :type k: int
     :rtype list:
     """
 
     # Set the path to the original undistorted data
-    data_dir = os.path.join(data_dir, 'undistorted')
+    undistorted_dir = os.path.join(data_dir, 'normalized', 'undistorted')
 
-    # Setup the NLTK FeqDist object to calculate the occurances of all words
-    # in the corpus.
+    # Setup the NLTK FeqDist object to calculate the occurances of all
+    # words in the corpus.
     fdist = FreqDist()
 
     # Loop through the sub-directories to collect samples in each input
     # class.
     for label in canonical_class_labels:
         # Create the path to the class samples.
-        class_dir = os.path.join(data_dir, label)
+        class_dir = os.path.join(undistorted_dir, label)
         # Loop through each file in the class directory.
         for file in os.listdir(class_dir):
             # Only process `.txt` files.
@@ -83,7 +84,7 @@ def get_W_k(data_dir, canonical_class_labels, k):
     # Retrieve the top `k` most frequent words from the frequency
     # distribution object as a list of strings.
     # adapted from:
-    # https://www.geeksforgeeks.org/python-convert-a-list-of-tuples-into-dictionary/
+    # https://www.geeksforgeeks.org/python-convert-a-list-of-tuples-into-dictionary/  # noqa: E501
     W_k = dict(fdist.most_common(n=k)).keys()
 
     return W_k
@@ -91,9 +92,9 @@ def get_W_k(data_dir, canonical_class_labels, k):
 
 def dv_ma(text, W_k):
     """
-    Replace words and numbers in an input text that are not in `W_k` (the `k`
-    most frequent words in a chosen corpus) with strings of asterisks or hash
-    symbols (respectively) of equivalent length.
+    Replace words and numbers in an input text that are not in `W_k`
+    (the `k` most frequent words in a chosen corpus) with strings of
+    asterisks or hash symbols (respectively) of equivalent length.
 
     :param text: Input text to distort.
     :type text: string
@@ -119,9 +120,9 @@ def dv_ma(text, W_k):
 
 def dv_sa(text, W_k):
     """
-    Replace words and numbers in an input text that are not in `W_k` (the `k`
-    most frequent words in a chosen corpus) with a single asterisk or hash
-    symbol (respectively).
+    Replace words and numbers in an input text that are not in `W_k` (the
+    `k` most frequent words in a chosen corpus) with a single asterisk or
+    hash symbol (respectively).
 
     :param text: Input text to distort.
     :type text: string
@@ -148,13 +149,13 @@ def dv_sa(text, W_k):
 def distort_text(data_dir, canonical_class_names, ks):
     """
     Main worker routine of text_distorter.py script.
-    Creates directories for new 'views' of distorted corpus, reads in corpus
-    to distort, and saves to appropriate sub-directories.
+    Creates directories for new 'views' of distorted corpus, reads in
+    corpus to distort, and saves to appropriate sub-directories.
 
     :param data_dir: Path to the parent dir of the source dataset.
     :type data_dir: str
-    :param canonical_class_names: Names of subdirectories containing data by
-    class.
+    :param canonical_class_names: Names of subdirectories containing data
+    by class.
     :type canonical_class_names: list
     :param ks: Distortion values `k`.
     :type ks: list
@@ -164,18 +165,23 @@ def distort_text(data_dir, canonical_class_names, ks):
         # Get the top `k` most frequent words from the entire corpus.
         W_k = get_W_k(data_dir, canonical_class_names, k)
         # Create two target directories for this value of `k`
-        dv_ma_k_path = os.path.join(data_dir, f'DV-MA-k-{k}')
+        dv_ma_k_path = os.path.join(data_dir, 'normalized',
+                                    f'DV-MA-k-{k}')
         os.makedirs(dv_ma_k_path, exist_ok=True)
-        dv_sa_k_path = os.path.join(data_dir, f'DV-SA-k-{k}')
+        dv_sa_k_path = os.path.join(data_dir, 'normalized',
+                                    f'DV-SA-k-{k}')
         os.makedirs(dv_sa_k_path, exist_ok=True)
         # Loop through the canonical class names
         for canonical_class in canonical_class_names:
             # Get the path to the directory for that class
-            class_directory = os.path.join(data_dir, 'undistorted', canonical_class)
+            class_directory = os.path.join(data_dir, 'normalized',
+                                           'undistorted', canonical_class)
             # Create new class based subdirectories for output
-            dv_ma_k_class_path = os.path.join(dv_ma_k_path, canonical_class)
+            dv_ma_k_class_path = os.path.join(dv_ma_k_path,
+                                              canonical_class)
             os.makedirs(dv_ma_k_class_path, exist_ok=True)
-            dv_sa_k_class_path = os.path.join(dv_sa_k_path, canonical_class)
+            dv_sa_k_class_path = os.path.join(dv_sa_k_path,
+                                              canonical_class)
             os.makedirs(dv_sa_k_class_path, exist_ok=True)
             # Loop through each file in the sub class directory
             for file in os.listdir(class_directory):
@@ -187,7 +193,8 @@ def distort_text(data_dir, canonical_class_names, ks):
                     with open(file_path, 'r') as f:
                         # Save contents to variable
                         text = f.read()
-                        # Distort the text with the Multiple Askterisks algo
+                        # Distort the text with the Multiple Askterisks
+                        # algo
                         dv_ma_text = dv_ma(text, W_k)
                         # Distort the text with the Single Askterisk algo
                         dv_sa_text = dv_sa(text, W_k)
@@ -211,6 +218,7 @@ def run_text_distorter(args):
     :type args: argparse.Namespace
     """
     data_dir = args.data_dir
+    data_dir = data_dir
     canonical_class_names = args.canonical_class_names
     ks = args.k_values
 
@@ -233,7 +241,8 @@ if __name__ == '__main__':
     parser.add_argument('-d',
                         '--data_dir',
                         type=str,
-                        help='<Required> The relative path to the data root',
+                        help=('<Required> The relative path to the data'
+                              ' root'),
                         required=True)
 
     # Set the class conical names
@@ -242,7 +251,8 @@ if __name__ == '__main__':
                         '--canonical_class_names',
                         type=str,
                         nargs='+',
-                        help='<Required> Names of class based subdirectories',
+                        help=('<Required> Names of class based'
+                              ' subdirectories'),
                         required=True)
 
     # # Set the different values of `k`
