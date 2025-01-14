@@ -54,7 +54,6 @@ class LILADataset(Dataset):
                  metadata_path,
                  cnk_size,
                  num_pairs,
-                 device,
                  seed=None):
         """
         Constructor for setting up data members needed for the
@@ -107,7 +106,7 @@ class LILADataset(Dataset):
         self._metadata_path = metadata_path
         self._cnk_size = cnk_size
         self._num_pairs = num_pairs
-        self._device = device
+        # self._device = device
         self._seed = seed
 
         self._metadata = pd.read_csv(self._metadata_path)
@@ -253,12 +252,15 @@ class LILADataset(Dataset):
                                                        dim=1)
 
             # Create tensors for special tokens
-            cls_token = torch.tensor([[self.tokenizer.cls_token_id]],
-                                     device=input_ids.device)
-            sep_token = torch.tensor([[self.tokenizer.sep_token_id]],
-                                     device=input_ids.device)
-            special_attention = torch.tensor([[1]],
-                                             device=attention_mask.device)
+            # cls_token = torch.tensor([[self.tokenizer.cls_token_id]],
+            #                          device=input_ids.device)
+            cls_token = torch.tensor([[self.tokenizer.cls_token_id]])
+            # sep_token = torch.tensor([[self.tokenizer.sep_token_id]],
+            #                          device=input_ids.device)
+            sep_token = torch.tensor([[self.tokenizer.sep_token_id]])
+            # special_attention = torch.tensor([[1]],
+            #                                  device=attention_mask.device)
+            special_attention = torch.tensor([[1]])
 
             # Process each chunk to add special tokens
             processed_cnks = []
@@ -266,14 +268,22 @@ class LILADataset(Dataset):
             for cnk_ids, cnk_mask in zip(cnks_input_ids,
                                          cnks_attention_mask):
                 # Add CLS token at start
+                # cnk_ids = torch.cat([cls_token,
+                #                      cnk_ids,
+                #                      sep_token],
+                #                     dim=1).to(self._device)
                 cnk_ids = torch.cat([cls_token,
                                      cnk_ids,
                                      sep_token],
-                                    dim=1).to(self._device)
+                                    dim=1)
+                # cnk_mask = torch.cat([special_attention,
+                #                       cnk_mask,
+                #                       special_attention],
+                #                      dim=1).to(self._device)
                 cnk_mask = torch.cat([special_attention,
                                       cnk_mask,
                                       special_attention],
-                                     dim=1).to(self._device)
+                                     dim=1)
 
                 # Pad final chunk if shorter than chunk size
                 short = self._cnk_size - cnk_ids.size(1)
