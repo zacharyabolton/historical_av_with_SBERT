@@ -132,7 +132,7 @@ class TestLILADataset:
                              cls.paths['test_metadata_path'],
                              cnk_size=cls.cnk_size,
                              num_pairs=cls.num_pairs,
-                             device=cls.device,
+                             # device=cls.device,
                              seed=cls.seed)
 
     @classmethod
@@ -340,10 +340,14 @@ class TestLILADataset:
             for cnk_start in range(0, length, cnk_len):
                 expected_cnk_ids = ts[cnk_start:cnk_start + cnk_len]
                 # Add CLS token at start
+                # expected_cnk_ids = torch.cat([cls_token,
+                #                               expected_cnk_ids,
+                #                               sep_token],
+                #                              dim=0).to(cls.device)
                 expected_cnk_ids = torch.cat([cls_token,
                                               expected_cnk_ids,
                                               sep_token],
-                                             dim=0).to(cls.device)
+                                             dim=0)
                 short = (cnk_len + 2) - expected_cnk_ids.size()[0]
                 if short > 0:
                     # # Adapted from:
