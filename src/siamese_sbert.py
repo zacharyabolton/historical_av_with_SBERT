@@ -177,7 +177,7 @@ class ContrastiveLoss(nn.Module):
     https://gist.github.com/ShairozS/1a5e6953f0533cf19240ae1473eaedde
     """
 
-    def __init__(self, margin=1.0, eps=1e-6):
+    def __init__(self, margin=1.0):
         """
         Initializes the Contrastive Loss model
 
@@ -189,7 +189,6 @@ class ContrastiveLoss(nn.Module):
 
         super(ContrastiveLoss, self).__init__()
         self.margin = margin
-        self.eps = eps  # Small constant to prevent numerical instability
 
     def forward(self, anchor, other, labels):
         """
