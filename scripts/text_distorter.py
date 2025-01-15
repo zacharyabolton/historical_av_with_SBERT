@@ -229,6 +229,16 @@ def run_text_distorter(args):
     distort_text(data_dir, canonical_class_names, ks)
 
 
+# Adapted from:
+# https://www.geeksforgeeks.org/how-to-pass-a-list-as-a-command-line-argument-with-argparse/
+def list_of_ints(arg):
+    return list(map(int, arg.split(',')))
+
+
+def list_of_strings(arg):
+    return arg.split(',')
+
+
 if __name__ == '__main__':
     # Adapted from:
     # https://github.com/JacobTyo/Valla/blob/main/valla/methods/AA_MHC.py
@@ -238,31 +248,23 @@ if __name__ == '__main__':
         description='Distort text from an input directory.')
 
     # Set the data directory path
-    parser.add_argument('-d',
-                        '--data_dir',
+    parser.add_argument('data_dir',
                         type=str,
                         help=('<Required> The relative path to the data'
-                              ' root'),
-                        required=True)
+                              ' root'))
 
     # Set the class conical names
     # Adapted from: https://stackoverflow.com/a/15753721
-    parser.add_argument('-c',
-                        '--canonical_class_names',
-                        type=str,
-                        nargs='+',
+    parser.add_argument('canonical_class_names',
+                        type=list_of_strings,
                         help=('<Required> Names of class based'
-                              ' subdirectories'),
-                        required=True)
+                              ' subdirectories'))
 
     # # Set the different values of `k`
     # ks = [300, 3000]
-    parser.add_argument('-k',
-                        '--k_values',
-                        type=int,
-                        nargs='+',
-                        help='<Required> `k` values to distort with',
-                        required=True)
+    parser.add_argument('k_values',
+                        type=list_of_ints,
+                        help='<Required> `k` values to distort with')
 
     args = parser.parse_args()
 
