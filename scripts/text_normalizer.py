@@ -88,8 +88,8 @@ def run_normalizer(args):
     data_dir = args.data_dir
     canonical_class_names = args.canonical_class_names
 
-    assert type(data_dir), 'str'
-    assert type(canonical_class_names), 'list'
+    assert type(data_dir) is str
+    assert type(canonical_class_names) is list
 
     normalize_text(data_dir, canonical_class_names)
 
