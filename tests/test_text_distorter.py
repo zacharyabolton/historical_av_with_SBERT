@@ -127,7 +127,7 @@ class TestPreprocessing:
 
         # Check that the `distort_text()` function created the expected
         # view directory.
-        assert os.path.isdir(source_dir) is True
+        assert os.path.isdir(source_dir)
 
         canonical_class_labels = sorted(os.listdir(source_dir))
         rows_idx = 0
@@ -137,7 +137,7 @@ class TestPreprocessing:
         for i, canonical_class in enumerate(canonical_class_labels):
             # Check that the expected sub-dirs exist.
             assert os.path.isdir(os.path.join(source_dir,
-                                              canonical_class)) is True
+                                              canonical_class))
             num_files = sum([1 for i
                              in cls.metadata_rows
                              if i[5] == canonical_class])
@@ -151,7 +151,7 @@ class TestPreprocessing:
 
                 # Check that the expected file exists with the proper
                 # name.
-                assert os.path.exists(file_path) is True
+                assert os.path.exists(file_path)
 
                 # Read in the file if it exists.
                 with open(file_path, 'r') as f:
@@ -162,7 +162,7 @@ class TestPreprocessing:
                     # contents.
                     assert (
                         expected_output[rows_idx + j] ==
-                        contents) is True
+                        contents)
             rows_idx += num_files
 
     def test_dv_ma_k_0(cls):
