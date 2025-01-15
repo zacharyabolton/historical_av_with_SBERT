@@ -94,6 +94,12 @@ def run_normalizer(args):
     normalize_text(data_dir, canonical_class_names)
 
 
+# Adapted from:
+# https://www.geeksforgeeks.org/how-to-pass-a-list-as-a-command-line-argument-with-argparse/
+def list_of_strings(arg):
+    return arg.split(',')
+
+
 if __name__ == '__main__':
     # Adapted from:
     # https://github.com/JacobTyo/Valla/blob/main/valla/methods/AA_MHC.py
@@ -103,22 +109,17 @@ if __name__ == '__main__':
         description='Distort text from an input directory.')
 
     # Set the data directory path
-    parser.add_argument('-d',
-                        '--data_dir',
+    parser.add_argument('data_dir',
                         type=str,
                         help=('<Required> The relative path to the data'
-                              ' root'),
-                        required=True)
+                              ' root'))
 
     # Set the class conical names
     # Adapted from: https://stackoverflow.com/a/15753721
-    parser.add_argument('-c',
-                        '--canonical_class_names',
-                        type=str,
-                        nargs='+',
+    parser.add_argument('canonical_class_names',
+                        type=list_of_strings,
                         help=('<Required> Names of class based'
-                              ' subdirectories'),
-                        required=True)
+                              ' subdirectories'))
 
     args = parser.parse_args()
 
