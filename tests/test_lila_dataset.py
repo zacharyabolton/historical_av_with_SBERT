@@ -4,6 +4,7 @@ This test suite tests this project's implementaion of the abstract PyTorch
 
 https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files  # noqa: E501
 """
+import random
 import math
 import os
 import sys
@@ -117,11 +118,8 @@ class TestLILADataset:
         cls.paths, cls.canonical_class_labels = generate_test_data(
             cls.test_data_directory, cls.dataset, cls.metadata_rows)
 
-        # Send all Tensor operations to mps if available, and cpu if not
-        # TODO: Get this to work on GPU systems as well (CUDA)
-        cls.device = "mps" if torch.backends.mps.is_available() else "cpu"
-        if cls.device == 'mps':
-            torch.mps.empty_cache()
+        # Reset any existing splits
+        LILADataset.reset_splits()
 
         # Insantiate PyTorch dataset object with mock data
         # and toy parameters for testing
@@ -132,7 +130,6 @@ class TestLILADataset:
                              cls.paths['test_metadata_path'],
                              cnk_size=cls.cnk_size,
                              num_pairs=cls.num_pairs,
-                             # device=cls.device,
                              seed=cls.seed)
 
     @classmethod
@@ -340,10 +337,6 @@ class TestLILADataset:
             for cnk_start in range(0, length, cnk_len):
                 expected_cnk_ids = ts[cnk_start:cnk_start + cnk_len]
                 # Add CLS token at start
-                # expected_cnk_ids = torch.cat([cls_token,
-                #                               expected_cnk_ids,
-                #                               sep_token],
-                #                              dim=0).to(cls.device)
                 expected_cnk_ids = torch.cat([cls_token,
                                               expected_cnk_ids,
                                               sep_token],
@@ -426,3 +419,122 @@ class TestLILADataset:
         assert isinstance(cls.ds._pairs[-1][1], dict)
         assert 'input_ids' in cls.ds._pairs[-1][1]
         assert 'attention_mask' in cls.ds._pairs[-1][1]
+        print(cls.ds._pairs[-1][1])
+
+    @classmethod
+    def setup_kfolds_dataset(cls):
+        """
+        Creates a separate dataset specifically for k-folds validation
+        testing with different characteristics than the main test dataset.
+        """
+        # Reset any existing splits
+        LILADataset.reset_splits()
+
+        # Create a larger but simpler dataset focused on k-folds testing
+        doc_len = 100
+
+        c1 = [f'a{i}' for i in range(doc_len)]
+        c2 = [f'b{i}' for i in range(doc_len)]
+        c3 = [f'c{i}' for i in range(doc_len)]
+        c4 = [f'd{i}' for i in range(doc_len)]
+        c5 = [f'e{i}' for i in range(doc_len)]
+        c6 = [f'f{i}' for i in range(doc_len)]
+
+        random.shuffle(c1)
+        random.shuffle(c2)
+        random.shuffle(c3)
+        random.shuffle(c4)
+        random.shuffle(c5)
+        random.shuffle(c6)
+
+        kfolds_dataset = [
+            ' '.join(c1),         # A-0
+            ' '.join(c2),         # A-1
+            ' '.join(c3),         # A-2
+            ' '.join(c4),         # notA-0
+            ' '.join(c5),         # notA-1
+            ' '.join(c6)          # notA-2
+        ]
+
+        kfolds_metadata_rows = [
+            ['A-0.txt', 'aauth', 'A author', 'mock genre 1', None,
+             'A', 1, False, len(kfolds_dataset[0].split())],
+            ['A-1.txt', 'aauth', 'A author', 'mock genre 1', None,
+             'A', 1, False, len(kfolds_dataset[1].split())],
+            ['A-2.txt', 'aauth', 'A author', 'mock genre 1', None,
+             'A', 1, False, len(kfolds_dataset[2].split())],
+            ['notA-0.txt', 'naauth', 'Imposter', 'mock genre 1', 'imp1',
+             'notA', 0, False, len(kfolds_dataset[3].split())],
+            ['notA-1.txt', 'naauth', 'Imposter', 'mock genre 1', 'imp1',
+             'notA', 0, False, len(kfolds_dataset[4].split())],
+            ['notA-2.txt', 'naauth', 'Imposter', 'mock genre 1', 'imp1',
+             'notA', 0, False, len(kfolds_dataset[5].split())]
+        ]
+
+        # Generate test data in a different directory
+        kfolds_dir = 'pytorch_ds_kfolds_test_dir'
+        paths, _ = generate_test_data(kfolds_dir, kfolds_dataset,
+                                      kfolds_metadata_rows)
+
+        # Run for 5 folds
+        n_splits = 5
+        # Create a dataset with different parameters
+        return LILADataset(
+            paths['undistorted_dir'],
+            paths['test_metadata_path'],
+            cnk_size=10,
+            num_pairs=500,
+            n_splits=n_splits,
+            seed=1
+        ), kfolds_dir, n_splits
+
+    def test_k_folds(cls):
+        """
+        Test k-fold cross validation with a simplified dataset
+        specifically for testing fold attributes.
+        """
+
+        # Get the k-folds specific dataset
+        kfolds_ds, kfolds_dir, n_splits = cls.setup_kfolds_dataset()
+
+        try:
+            # K-fold cross-validation loop
+            for fold_idx in range(n_splits):
+                train_dataset, val_dataset = kfolds_ds.\
+                    get_train_val_datasets(fold_idx)
+
+                val_len = len(val_dataset)
+                train_len = len(train_dataset)
+                # From scikitlearn doc "KFold" at:
+                # https://scikit-learn.org/dev/modules/generated/sklearn.model_selection.KFold.html  # noqa: E501
+                # > The first n_samples % n_splits folds have size
+                # > n_samples // n_splits + 1, other folds have size
+                # > n_samples // n_splits,
+                # > where n_samples is the number of samples.
+                if fold_idx < (kfolds_ds._num_pairs % n_splits):
+                    expected_val_len = kfolds_ds._num_pairs //\
+                        n_splits + 1
+                    expected_train_len = kfolds_ds._num_pairs -\
+                        expected_val_len
+                    assert val_len == expected_val_len
+                    assert train_len == expected_train_len
+                else:
+                    expected_val_len = kfolds_ds._num_pairs // n_splits
+                    expected_train_len = kfolds_ds._num_pairs -\
+                        expected_val_len
+                    assert val_len == expected_val_len
+                    assert train_len == expected_train_len
+
+                # Adapted from:
+                # https://stackoverflow.com/a/16008760
+                def hash_pair(p):
+                    return hash(str(p[0]) + str(p[1]))
+
+                # Verify contents of splits are disjoint
+                for pair in train_dataset._pairs:
+                    hashed_val_pairs = [hash_pair(p)
+                                        for p in val_dataset._pairs]
+                    assert hash_pair(pair) not in hashed_val_pairs
+        finally:
+            # Clean up k-folds specific dataset
+            destroy_test_data(kfolds_dir)
