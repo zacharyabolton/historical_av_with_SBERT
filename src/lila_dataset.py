@@ -14,6 +14,7 @@ import torch
 import pandas as pd
 import math
 import copy
+from sklearn.model_selection import KFold
 # import torch.nn.functional as F  # Only if preserving ending chunks
 
 
@@ -44,16 +45,19 @@ def collate_fn(batch):
 class LILADataset(Dataset):
     """
     Custom torch dataset.
-
-    :param data_dir: The directory of the data files.
-    :type data_dir: string
     """
+    _fold_splits = None
+    _base_pairs = None
+    _n_splits = 5
 
     def __init__(self,
                  data_dir,
                  metadata_path,
                  cnk_size,
                  num_pairs,
+                 n_splits=5,
+                 fold_idx=None,
+                 training=True,
                  seed=None):
         """
         Constructor for setting up data members needed for the
@@ -85,9 +89,17 @@ class LILADataset(Dataset):
         number for data-balancing purposes.
         :type num_pairs: int
 
-        :param device: <Required> The device to run tensor operations on.
-        For use in paralelization/cuncurrency to speed up training.
-        :type device: str
+        :param n_splits: <Optional> Number of 'folds' to split the data
+        into for k-folds cross-validation.
+        :type n_splits: int
+
+        :param fold_idx: <Optional> Fold index to assign as validation
+        split.
+        :type fold_idx: int
+
+        :param training: <Optional> Flag to indicate whether the dataset
+        is intended for training or validation runs.
+        :type training: bool
 
         :param seed: <Optional> An integer to pass in to the `random`
         module as a seed, for reproducibility. Defaults to `None` which
@@ -106,45 +118,128 @@ class LILADataset(Dataset):
         self._metadata_path = metadata_path
         self._cnk_size = cnk_size
         self._num_pairs = num_pairs
-        # self._device = device
+        self.fold_idx = fold_idx
+        self.training = training
         self._seed = seed
 
-        self._metadata = pd.read_csv(self._metadata_path)
-        # Filter out 'omitted' works
-        omitted_mask = self._metadata['omit'] == False  # noqa: E712
-        self._metadata = self._metadata[omitted_mask]
-        self._metadata.reset_index(inplace=True)
+        if LILADataset._base_pairs is not None:
+            # Don't generate pairs and splits if this is not the first
+            # instance
+            assert type(fold_idx) is int, ("This is not the first"
+                                           " instance. Therefore it"
+                                           " should be a train/val"
+                                           " instance, and the fold_idx"
+                                           " parameter should be"
+                                           " supplied.")
+        else:
+            # Only generate pairs and splits if this is the first instance
+            assert n_splits > 1, ("This model is intended for use with"
+                                  " K-Folds Cross-Validation, which"
+                                  " requires `n_splits` greater than 1."
+                                  f" {n_splits} was passed.")
+            assert n_splits < 11, ("`n_splits` greater than 10 will"
+                                   " result in validation sets under 10%"
+                                   f" of the dataset. {n_splits} was"
+                                   " passed.")
+            assert fold_idx is None, ("This is the first instance of"
+                                      " LILADataset, intended for all"
+                                      " pairs generation. `fold_idx` is"
+                                      " not appropriate as this is not a"
+                                      " training or validation"
+                                      " LILADataset.")
+            # Store the data, at different levels of processing, at the
+            # class level
+            self._metadata = pd.read_csv(self._metadata_path)
+            # Filter out 'omitted' works
+            omitted_mask = self._metadata['omit'] == False  # noqa: E712
+            self._metadata = self._metadata[omitted_mask]
+            self._metadata.reset_index(inplace=True)
 
-        self._A_dir = os.path.join(self._data_dir, "A")
-        self._U_dir = os.path.join(self._data_dir, "U")
-        self._notA_dir = os.path.join(self._data_dir, "notA")
+            self._A_dir = os.path.join(self._data_dir, "A")
+            self._U_dir = os.path.join(self._data_dir, "U")
+            self._notA_dir = os.path.join(self._data_dir, "notA")
 
-        self._A_docs = self._get_docs(self._A_dir)
-        self._U_docs = self._get_docs(self._U_dir)
-        self._notA_docs = self._get_docs(self._notA_dir)
+            self._A_docs = self._get_docs(self._A_dir)
+            self._U_docs = self._get_docs(self._U_dir)
+            self._notA_docs = self._get_docs(self._notA_dir)
 
-        self._A_docs_tokenized = self._tokenize(self._A_docs)
-        self._U_docs_tokenized = self._tokenize(self._U_docs)
-        self._notA_docs_tokenized = self._tokenize(self._notA_docs)
+            self._A_docs_tokenized = self._tokenize(self._A_docs)
+            self._U_docs_tokenized = self._tokenize(self._U_docs)
+            self._notA_docs_tokenized = self._tokenize(self._notA_docs)
 
-        self._A_docs_cnked = self._cnk_tokens(self._A_docs_tokenized)
-        self._U_docs_cnked = self._cnk_tokens(self._U_docs_tokenized)
-        self._notA_docs_cnked = self._cnk_tokens(
-            self._notA_docs_tokenized)
+            self._A_docs_cnked = self._cnk_tokens(self._A_docs_tokenized)
+            self._U_docs_cnked = self._cnk_tokens(self._U_docs_tokenized)
+            self._notA_docs_cnked = self._cnk_tokens(
+                self._notA_docs_tokenized)
 
-        self._pairs = self._create_pairs(self._A_docs_cnked,
-                                         self._notA_docs_cnked)
+            # Create all pairs first without train/val splitting
+            LILADataset._base_pairs = self._create_pairs(
+                self._A_docs_cnked, self._notA_docs_cnked)
+
+            # Save the input number of splits on the class level
+            LILADataset._n_splits = n_splits
+
+            # Initialize KFold
+            kf = KFold(n_splits=LILADataset._n_splits, shuffle=True,
+                       random_state=seed)
+
+            # Convert pairs to indices
+            indices = list(range(len(LILADataset._base_pairs)))
+
+            # Store fold splits. A list of tuples of lists, where outer
+            # the list's tuple elements are splits for each fold, and the
+            # inner tuples' elements are lists of indices into the full
+            # dataset locating training samples (tuple element 0) or
+            # validation samples (tuple element 1)
+            LILADataset._fold_splits = list(kf.split(indices))
+
+        # Use the stored splits and pairs
+        # If fold_idx is provided, use only that fold's data
+        if self.fold_idx is not None:
+            assert 0 <= self.fold_idx <\
+                LILADataset._n_splits, ("`fold_idx must be between 0 and"
+                                        f" {LILADataset.n_splits-1}")
+            train_idx, val_idx = LILADataset._fold_splits[self.fold_idx]
+            if self.training:
+                self._pairs = [LILADataset._base_pairs[i]
+                               for i in train_idx]
+            else:
+                self._pairs = [LILADataset._base_pairs[i]
+                               for i in val_idx]
+        else:
+            self._pairs = LILADataset._base_pairs
+
+    @classmethod
+    def reset_splits(cls):
+        """
+        Reset the pairs and splits stored on the class level.
+        """
+        cls.n_splits = 5
+        cls._fold_splits = None
+        cls._base_pairs = None
 
     def __len__(self):
         """
         Returns the total number of pairs in the dataset.
+        If fold_idx is set, returns only the number of pairs in that
+        fold's train or validation split.
+
+        :returns: Number of pairs
+        :rtype: int
         """
         return len(self._pairs)
 
-    def __getitem__(self, idx: int):
+    def __getitem__(self, idx):
         """
         Get a single pair of text chunks with their label.
+
+        :param idx: Index of the pair to retrieve
+        :type idx: int
+        :return: Tuple of (anchor_chunk, other_chunk, label)
+        :rtype: tuple
         """
+        assert 0 <= idx < len(self), (f"`Index {idx} is out of bounds"
+                                      f" for dataset of size {len(self)}")
         return self._pairs[idx]
 
     def _get_docs(self, dir):
@@ -251,15 +346,8 @@ class LILADataset(Dataset):
             cnks_attention_mask = attention_mask.split(cnk_size_reduced,
                                                        dim=1)
 
-            # Create tensors for special tokens
-            # cls_token = torch.tensor([[self.tokenizer.cls_token_id]],
-            #                          device=input_ids.device)
             cls_token = torch.tensor([[self.tokenizer.cls_token_id]])
-            # sep_token = torch.tensor([[self.tokenizer.sep_token_id]],
-            #                          device=input_ids.device)
             sep_token = torch.tensor([[self.tokenizer.sep_token_id]])
-            # special_attention = torch.tensor([[1]],
-            #                                  device=attention_mask.device)
             special_attention = torch.tensor([[1]])
 
             # Process each chunk to add special tokens
@@ -267,19 +355,10 @@ class LILADataset(Dataset):
 
             for cnk_ids, cnk_mask in zip(cnks_input_ids,
                                          cnks_attention_mask):
-                # Add CLS token at start
-                # cnk_ids = torch.cat([cls_token,
-                #                      cnk_ids,
-                #                      sep_token],
-                #                     dim=1).to(self._device)
                 cnk_ids = torch.cat([cls_token,
                                      cnk_ids,
                                      sep_token],
                                     dim=1)
-                # cnk_mask = torch.cat([special_attention,
-                #                       cnk_mask,
-                #                       special_attention],
-                #                      dim=1).to(self._device)
                 cnk_mask = torch.cat([special_attention,
                                       cnk_mask,
                                       special_attention],
@@ -501,3 +580,41 @@ class LILADataset(Dataset):
         all_pairs = same_auth_pairs + diff_auth_pairs
 
         return all_pairs
+
+    def get_train_val_datasets(self, fold_idx):
+        """
+        Get the training and validation datasets for a specific fold.
+
+        :param fold_idx: The index of the fold to use
+        :type fold_idx: int
+
+        :return: Tuple of (train_dataset, val_dataset) where each item is
+        an array of training or validation pairs.
+        :rtype: tuple
+        """
+        assert 0 <= fold_idx <\
+            LILADataset._n_splits, ("fold_idx must be between 0 and"
+                                    f" {LILADataset._n_splits-1}")
+
+        # Create new instances for training and validation
+        train_dataset = LILADataset(
+            self._data_dir,
+            self._metadata_path,
+            self._cnk_size,
+            self._num_pairs,
+            fold_idx=fold_idx,
+            training=True,
+            seed=self._seed
+        )
+
+        val_dataset = LILADataset(
+            self._data_dir,
+            self._metadata_path,
+            self._cnk_size,
+            self._num_pairs,
+            fold_idx=fold_idx,
+            training=False,
+            seed=self._seed
+        )
+
+        return train_dataset, val_dataset
