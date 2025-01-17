@@ -7,10 +7,11 @@ import sys
 import os
 import torch
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import LinearLR
 import time
 import argparse
 from datetime import datetime
-from constants import ROOT_DIR, MODEL, LEARNING_RATE
+from constants import ROOT_DIR, MODEL, INITIAL_LEARNING_RATE
 
 # Add src directory to sys.path
 # Adapted from Taras Alenin's answer on StackOverflow at:
@@ -34,7 +35,7 @@ if device == 'mps':
     torch.mps.empty_cache()
 
 
-def save_results(run_dir, k, losses, args):
+def save_results(run_dir, k, epoch_losses, args):
     """
     A function to save the results of a full k-folds cross-validation
     training run on the SiameseSBERT model using the LILADataset.
@@ -46,7 +47,8 @@ def save_results(run_dir, k, losses, args):
     :param k: <Required> The fold index data to save.
     :type k: int
 
-    :param losses: <Required> A list of batch losses per k fold run.
+    :param losses: <Required> A list of lists of batch losses per k fold
+    run.
     :type losses: list
 
     :param args: <Required> A dictionary mapping hyperparameters to their
@@ -67,9 +69,13 @@ def save_results(run_dir, k, losses, args):
     filepath = os.path.join(run_dir, filename)
 
     # CSV-ify losses and save to output dir
-    string_losses = [str(tensor.item()) for tensor in losses]
+    plain_losses = [[str(tensor.item()) for tensor in losses] for losses in epoch_losses]
     with open(filepath, 'w') as f:
-        f.write(','.join(string_losses))
+        for i, losses in enumerate(plain_losses):
+            if i == len(plain_losses) - 1:
+                f.write(','.join(losses))
+            else:
+                f.write(','.join(losses) + '\n')
         print(f"Losses saved to {filepath}.")
 
 
@@ -79,8 +85,8 @@ def train(batch_size,
           margin,
           epsilon,
           num_pairs,
-          n_splits,
-          epochs):
+          num_splits,
+          num_epochs):
     """
     The main training loop for SiameseSBERT on LILADataset.
 
@@ -112,11 +118,11 @@ def train(batch_size,
     in total, for both training and evaluation.
     :type num_pairs: int
 
-    :param n_splits: <Required> The number of k-folds splits to divide the
-    dataset into for k-fold cross-validation.
-    :type n_splits: int
+    :param num_splits: <Required> The number of k-folds splits to divide
+    the dataset into for k-fold cross-validation.
+    :type num_splits: int
 
-    :param epochs: <Required> The number of times to train the
+    :param num_epochs: <Required> The number of times to train the
     SiameseSBERT model on the entire dataset.
     """
 
@@ -132,19 +138,6 @@ def train(batch_size,
     run_dir = os.path.join(output_dir, '_'.join(current_time.split()))
     if not os.path.exists(run_dir):
         os.mkdir(run_dir)
-
-    # Instantiate custom Siamese SBERT model and move to device
-    model = SiameseSBERT(MODEL).to(device)
-
-    # Instantiate custom contrastive loss function
-    # TODO: Consider implementing 'modified contrastive loss' from
-    # https://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf
-    # [18] and Tyo Et. Al (2021) [15]
-    loss_function = ContrastiveLoss(margin=margin)
-
-    # Instantiate Adam optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE,
-                                 eps=epsilon)
 
     # Reset any existing splits
     LILADataset.reset_splits()
@@ -166,7 +159,7 @@ def train(batch_size,
                                '../data/normalized/metadata.csv',
                                cnk_size=chunk_size,
                                num_pairs=num_pairs,
-                               n_splits=n_splits)
+                               num_splits=num_splits)
 
     try:
         # Create list to store batch processing durations for
@@ -174,20 +167,49 @@ def train(batch_size,
         durations = []
         start_time = time.time()
 
-        # Perform a full training cycle `n_splits` times, changing the
+        # Perform a full training cycle `num_splits` times, changing the
         # train/validation sets each time (K-folds cross-validation)
-        for fold_idx in range(n_splits):
-            # Extract the train and validation datasets
-            train_dataset, val_dataset = full_dataset\
-                .get_train_val_datasets(fold_idx)
+        for fold_idx in range(num_splits):
+            print(f"\n\nFOLD {fold_idx}")
+            print('---------------------------------')
+            # Instantiate custom Siamese SBERT model and move to device
+            model = SiameseSBERT(MODEL).to(device)
 
-            # Instantiate the dataloader for the train_dataset
-            train_dataloader = DataLoader(
-                train_dataset,
-                batch_size=batch_size,
-                shuffle=True,
-                collate_fn=collate_fn,
-            )
+            # Instantiate custom contrastive loss function
+            # TODO: Consider implementing 'modified contrastive loss' from
+            # https://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf  # noqa: E501
+            # [18] and Tyo Et. Al (2021) [15]
+            loss_function = ContrastiveLoss(margin=margin)
+
+            # Instantiate Adam optimizer
+            optimizer = torch.optim.Adam(model.parameters(),
+                                         lr=INITIAL_LEARNING_RATE,
+                                         eps=epsilon)
+
+            # Ibrahim et al. (2023) [7:10] state:
+            # > The list below includes the hyper-parameters considered,
+            # > together with the values selected after fine tuning, using
+            # > the validation set.
+            # > • [...]
+            # > • Scheduler: The learning rate scheduler was set to
+            # >   ’warmuplinear’, which gradually increases the learning
+            # >   rate during the warm-up phase and then linearly decays
+            # >   it.
+            # > • Warmup Steps: The warm-up steps were set to 0,
+            # >   indicating that no warm-up phase was employed
+            # > • Learning Rate: We set the initial learning rate to
+            #     2e-05, which determines the step size during gradient
+            #     descent optimization.
+            #
+            # In short, Ibrahim et al. used a linear learning rate
+            # scheduler in their implementation.
+            # Adapted from:
+            # https://machinelearningmastery.com/using-learning-rate-schedule-in-pytorch-training/  # noqa: E501
+            # Start at full learning rate (2e-05)
+            # End at 10% of initial learning rate
+            scheduler = LinearLR(optimizer, start_factor=1.0,
+                                 end_factor=0.1,
+                                 total_iters=num_epochs)
 
             # TRAINING LOOP
             ##############################################################
@@ -195,96 +217,125 @@ def train(batch_size,
             # Set model to training mode
             model.train()
 
-            # Create list to store batch losses
+            # Create a list to store all losses
             losses = []
 
-            # Gradient Accumulation Implementation:
-            # Adapted from
-            # https://stackoverflow.com/a/78619879 [37]
-            # Initialize running total for gradients
-            optimizer.zero_grad()
+            for epoch in range(num_epochs):
+                print(f"\nEPOCH {epoch}")
+                # Extract the train and validation datasets
+                train_dataset, val_dataset = full_dataset\
+                    .get_train_val_datasets(fold_idx)
+                print(len(train_dataset), "train samples")
+                print(len(val_dataset), "val samples")
 
-            # Iterate over the train_dataloader one batch at a time
-            for batch_idx, (batch_anchor,
-                            batch_other,
-                            labels) in enumerate(train_dataloader):
-                # batch_content is a tuple containing three elements
-                # coming from the PyTorch `DataLoader` object:
-                # - batch_anchor at index 0 - the batch tensor of chunks
-                #   to be fed through the 'left' side of the Siamese
-                #   network.
-                # - batch_other at index 1 - the batch tensor of chunks to
-                #   be fed through the 'right' side of the Siamese
-                #   network.
-                # - labels at index 2 - the ground truths for the pairs:
-                #     - 1 = same-author
-                #     - 0 = different-author
-
-                # Move batch to device (MPS/CPU)
-                batch_anchor = {k: v.to(device)
-                                for k, v in batch_anchor.items()}
-                batch_other = {k: v.to(device)
-                               for k, v in batch_other.items()}
-                labels = labels.to(device)
-
-                # Forward pass with error checking
-                anchor_embedding, other_embedding = model(
-                    batch_anchor['input_ids'],
-                    batch_anchor['attention_mask'],
-                    batch_other['input_ids'],
-                    batch_other['attention_mask']
+                # Instantiate the dataloader for the train_dataset
+                train_dataloader = DataLoader(
+                    train_dataset,
+                    batch_size=batch_size,
+                    shuffle=True,
+                    collate_fn=collate_fn,
                 )
 
-                # Calculate the contrastive loss of this batch and normalize
-                # by accumulation steps
-                loss = loss_function(anchor_embedding, other_embedding,
-                                     labels) / accumulation_steps
-                # Save the batch loss
-                # unnormalized loss for reporting
-                losses.append(loss * accumulation_steps)
+                print(len(train_dataloader), "batches")
+
+                # Create list to store epoch losses
+                epoch_losses = []
 
                 # Gradient Accumulation Implementation:
                 # Adapted from
                 # https://stackoverflow.com/a/78619879 [37]
-                # Backpropogation pass
-                loss.backward()
+                # Initialize running total for gradients
+                optimizer.zero_grad()
 
-                # Step the optimizer every accumulation_steps batches
-                if (batch_idx + 1) % accumulation_steps == 0:
-                    # Gradient Accumulation Implementation:
-                    # Adapted from
-                    # https://stackoverflow.com/a/78619879 [37]
+                # Iterate over the train_dataloader one batch at a time
+                for batch_idx, (batch_anchor,
+                                batch_other,
+                                labels) in enumerate(train_dataloader):
+                    # batch_content is a tuple containing three elements
+                    # coming from the PyTorch `DataLoader` object:
+                    # - batch_anchor at index 0 - the batch tensor of
+                    #   chunks to be fed through the 'left' side of the
+                    #   Siamese network.
+                    # - batch_other at index 1 - the batch tensor of
+                    #   chunks to be fed through the 'right' side of the
+                    #   Siamese network.
+                    # - labels at index 2 - the ground truths for the
+                    #   pairs:
+                    #     - 1 = same-author
+                    #     - 0 = different-author
 
-                    # Update weights using calculated gradients from Adam
-                    # optimizer
-                    optimizer.step()
-                    # Clear out any existing gradients
-                    optimizer.zero_grad()
+                    # Move batches to device (MPS/CPU)
+                    batch_anchor = {k: v.to(device)
+                                    for k, v in batch_anchor.items()}
+                    batch_other = {k: v.to(device)
+                                   for k, v in batch_other.items()}
+                    labels = labels.to(device)
 
-                    # Clear MPS cache periodically
-                    if device == 'mps':
-                        torch.mps.empty_cache()
+                    # Forward pass
+                    anchor_embedding, other_embedding = model(
+                        batch_anchor['input_ids'],
+                        batch_anchor['attention_mask'],
+                        batch_other['input_ids'],
+                        batch_other['attention_mask']
+                    )
 
-                # Calculate when the batch finished processing
-                end_time = time.time()
-                # Calculate the duration
-                duration = end_time - start_time
-                # Save the result
-                durations.append(duration)
+                    # Calculate the contrastive loss of this batch and
+                    # normalize by accumulation steps
+                    loss = loss_function(anchor_embedding,
+                                         other_embedding,
+                                         labels) / accumulation_steps
+                    # Save the batch loss
+                    # unnormalized loss for reporting
+                    epoch_losses.append(loss * accumulation_steps)
 
-                if batch_idx % 10 == 0:
-                    avg_duration = sum(durations[-10:]) /\
-                        min(len(durations), 10)
-                    avg_loss = sum(losses[-10:]) / min(len(losses), 10)
-                    print(f'Batch {batch_idx}, '
-                          f'Loss: {loss.item():.4f}, '
-                          f'10-rolling avg Loss: {avg_loss:.4f}, '
-                          '10-rolling avg Time/Batch:'
-                          f' {avg_duration:.2f}s')
+                    # Backpropogation pass
+                    loss.backward()
 
-                start_time = time.time()
+                    # Step the optimizer every accumulation_steps batches
+                    if (batch_idx + 1) % accumulation_steps == 0:
+                        # Gradient Accumulation Implementation:
+                        # Adapted from
+                        # https://stackoverflow.com/a/78619879 [37]
 
-            # SAVE RESULTS!
+                        # Update weights using calculated gradients from
+                        # Adam optimizer
+                        optimizer.step()
+                        # Clear out any existing gradients
+                        optimizer.zero_grad()
+
+                        # Clear MPS cache periodically
+                        if device == 'mps':
+                            torch.mps.empty_cache()
+
+                    # Calculate when the batch finished processing
+                    end_time = time.time()
+                    # Calculate the duration
+                    duration = end_time - start_time
+                    # Save the result
+                    durations.append(duration)
+
+                    if batch_idx % 10 == 0:
+                        avg_duration = sum(durations[-10:]) /\
+                            min(len(durations), 10)
+                        avg_loss = sum(epoch_losses[-10:]) /\
+                            min(len(epoch_losses), 10)
+                        print(f'Batch {batch_idx}, '
+                              f'Loss: {loss.item():.4f}, '
+                              f'10-rolling avg Loss: {avg_loss:.4f}, '
+                              '10-rolling avg Time/Batch:'
+                              f' {avg_duration:.2f}s')
+
+                    start_time = time.time()
+
+                # Save epoch lossess to entire run losses list
+                losses.append(epoch_losses)
+
+                # Adapted from:
+                # https://machinelearningmastery.com/using-learning-rate-schedule-in-pytorch-training/  # noqa: E501
+                # Update the learning rate ahead of new epoch
+                scheduler.step()
+
+            # SAVE RESULTS OF THIS FOLD!
             save_results(run_dir,
                          fold_idx,
                          losses,
@@ -295,8 +346,8 @@ def train(batch_size,
                              "margin": margin,
                              "epsilon": epsilon,
                              "num_pairs": num_pairs,
-                             "n_splits": n_splits,
-                             "epochs": epochs,
+                             "num_splits": num_splits,
+                             "num_epochs": num_epochs,
                          })
 
     except KeyboardInterrupt:
@@ -314,7 +365,8 @@ def train(batch_size,
             # Calculate effective batch statistics
             total_samples = len(train_dataset)
             effective_batch_size = batch_size * accumulation_steps
-            # estimated_total_batches = total_samples / effective_batch_size
+            # estimated_total_batches = total_samples /\
+            #     effective_batch_size
             # estimated_total_time = (avg_duration *
             #                         estimated_total_batches *
             #                         accumulation_steps)
@@ -341,8 +393,8 @@ def run_training_loop(args):
     margin = args.margin
     epsilon = args.epsilon
     num_pairs = args.num_pairs
-    n_splits = args.n_splits
-    epochs = args.epochs
+    num_splits = args.num_splits
+    num_epochs = args.num_epochs
 
     # Verify types
     assert type(batch_size) is int
@@ -351,8 +403,8 @@ def run_training_loop(args):
     assert type(margin) is float
     assert type(epsilon) is float
     assert type(num_pairs) is int
-    assert type(n_splits) is int
-    assert type(epochs) is int
+    assert type(num_splits) is int
+    assert type(num_epochs) is int
 
     # Verify some boundary conditions
     assert batch_size >= 1, ("ERROR: You chose a batch size of"
@@ -372,12 +424,12 @@ def run_training_loop(args):
     assert num_pairs % 2 == 0, ("ERROR: You chose an odd numer of pairs."
                                 "\n For balancing reasons, it is required"
                                 " that `num_pairs` be even.")
-    assert 0 < n_splits < 11, ("Please choose k-folds splits between 1"
-                               " and 10. 0 would result in no dataset,"
-                               " and greater than 10 would result in a"
-                               " validation split of less than 10%.")
-    assert epochs > 0, ("Epochs must be greater than zero."
-                        f" {epochs} was passed.")
+    assert 0 < num_splits < 11, ("Please choose k-folds splits between 1"
+                                 " and 10. 0 would result in no dataset,"
+                                 " and greater than 10 would result in a"
+                                 " validation split of less than 10%.")
+    assert num_epochs > 0, ("Epochs must be greater than zero."
+                            f" {num_epochs} was passed.")
 
     # Run training
     train(
@@ -387,8 +439,8 @@ def run_training_loop(args):
         margin,
         epsilon,
         num_pairs,
-        n_splits,
-        epochs
+        num_splits,
+        num_epochs
     )
 
 
@@ -442,14 +494,14 @@ if __name__ == '__main__':
                               ' in total (train & validate).'))
 
     # Set the number of k-folds splits
-    parser.add_argument('n_splits',
+    parser.add_argument('num_splits',
                         type=int,
                         help=('<Required> [int] Number of divisions of'
                               ' of the dataset for k-folds'
                               ' cross-validation.'))
 
     # Set the number of epochs
-    parser.add_argument('epochs',
+    parser.add_argument('num_epochs',
                         type=int,
                         help=('<Required> [int] Number of times to train'
                               ' the model on the full dataset.'))
