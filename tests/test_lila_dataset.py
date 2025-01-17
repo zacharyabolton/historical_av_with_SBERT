@@ -477,16 +477,16 @@ class TestLILADataset:
                                       kfolds_metadata_rows)
 
         # Run for 5 folds
-        n_splits = 5
+        num_splits = 5
         # Create a dataset with different parameters
         return LILADataset(
             paths['undistorted_dir'],
             paths['test_metadata_path'],
             cnk_size=10,
             num_pairs=500,
-            n_splits=n_splits,
+            num_splits=num_splits,
             seed=1
-        ), kfolds_dir, n_splits
+        ), kfolds_dir, num_splits
 
     def test_k_folds(cls):
         """
@@ -495,11 +495,11 @@ class TestLILADataset:
         """
 
         # Get the k-folds specific dataset
-        kfolds_ds, kfolds_dir, n_splits = cls.setup_kfolds_dataset()
+        kfolds_ds, kfolds_dir, num_splits = cls.setup_kfolds_dataset()
 
         try:
             # K-fold cross-validation loop
-            for fold_idx in range(n_splits):
+            for fold_idx in range(num_splits):
                 train_dataset, val_dataset = kfolds_ds.\
                     get_train_val_datasets(fold_idx)
 
@@ -507,19 +507,19 @@ class TestLILADataset:
                 train_len = len(train_dataset)
                 # From scikitlearn doc "KFold" at:
                 # https://scikit-learn.org/dev/modules/generated/sklearn.model_selection.KFold.html  # noqa: E501
-                # > The first n_samples % n_splits folds have size
-                # > n_samples // n_splits + 1, other folds have size
-                # > n_samples // n_splits,
+                # > The first n_samples % num_splits folds have size
+                # > n_samples // num_splits + 1, other folds have size
+                # > n_samples // num_splits,
                 # > where n_samples is the number of samples.
-                if fold_idx < (kfolds_ds._num_pairs % n_splits):
+                if fold_idx < (kfolds_ds._num_pairs % num_splits):
                     expected_val_len = kfolds_ds._num_pairs //\
-                        n_splits + 1
+                        num_splits + 1
                     expected_train_len = kfolds_ds._num_pairs -\
                         expected_val_len
                     assert val_len == expected_val_len
                     assert train_len == expected_train_len
                 else:
-                    expected_val_len = kfolds_ds._num_pairs // n_splits
+                    expected_val_len = kfolds_ds._num_pairs // num_splits
                     expected_train_len = kfolds_ds._num_pairs -\
                         expected_val_len
                     assert val_len == expected_val_len
