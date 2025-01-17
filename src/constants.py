@@ -16,4 +16,4 @@ ROOT_DIR = os.path.dirname(Path(__file__).parent)
 MODEL = 'sentence-transformers/all-MiniLM-L12-v2'
 # Learning rate of 2e-05 as per Ibrahim Et. Al (2023) [13:10]
 # This is intentionally very small as we are fine-tuning a pre-trained model
-LEARNING_RATE = 2e-05
+INITIAL_LEARNING_RATE = 2e-05
