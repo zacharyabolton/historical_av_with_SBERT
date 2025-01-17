@@ -10,7 +10,7 @@ import torch
 import math
 from torch.utils.data import DataLoader
 from transformers.models.bert.modeling_bert import BertModel
-from constants import ROOT_DIR, MODEL, LEARNING_RATE
+from constants import ROOT_DIR, MODEL, INITIAL_LEARNING_RATE
 from transformers import AutoTokenizer
 
 
@@ -136,7 +136,7 @@ class TestSiameseSBERT:
 
         # Instantiate Adam optimizer
         cls.optimizer = torch.optim.Adam(cls.model.parameters(),
-                                         lr=LEARNING_RATE,
+                                         lr=INITIAL_LEARNING_RATE,
                                          eps=cls.epsilon)
 
         # Insantiate PyTorch dataset object and dataloadeer with mock data
