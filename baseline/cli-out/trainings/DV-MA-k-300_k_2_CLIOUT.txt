@@ -1,0 +1,8 @@
+Namespace(train=True, input_pairs='data/train/DV-MA-k-300/k_2', input_truth='data/train/DV-MA-k-300/k_2', test_dir=None, output='out/DV-MA-k-300/k_2', model_dir='models/baseline/DV-MA-k-300/k_2', seed=2020, vocab_size=3000, ngram_size=4, num_iterations=0, dropout=0.5)
+-> constructing vectorizer
+-> calculating pairwise similarities
+-> grid search p1/p2:
+optimal p1/p2: 0.01 0.98
+optimal score: {'auc': np.float64(0.532), 'c@1': 0.486, 'f_05_u': 0.532, 'F1': np.float64(0.672), 'brier': np.float64(0.727), 'overall': np.float64(0.59)}
+-> determining optimal threshold
+Dev results -> F1=0.6670955291090382 at th=0.25

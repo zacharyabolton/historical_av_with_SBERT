@@ -1,0 +1,4 @@
+Namespace(train=False, input_pairs=None, input_truth=None, test_dir='data/validate/undistorted/k_4', output='out/undistorted/k_4', model_dir='models/baseline/undistorted/k_4', seed=2020, vocab_size=3000, ngram_size=4, num_iterations=0, dropout=0.5)
+p1 = 0.42 , p2 = 0.44
+-> calculating test similarities
+4144 cases
