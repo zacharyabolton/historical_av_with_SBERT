@@ -129,7 +129,7 @@ All works are stated as belonging to the public domain by [Project Gutenberg](ht
     These works were preprocessed and obfuscated for ingestion into a machine learning algorithm focused on the task of authorship verification.
     This data and any data, models, or intellectual product derived thereof are not for commercial use.
 
-_All other workds_ were published before 1923, and therefore is in the public domain: <https://guides.library.oregonstate.edu/copyright/publicdomain#>
+_All other works_ were published before 1923, and therefore is in the public domain: <https://guides.library.oregonstate.edu/copyright/publicdomain#>
 
 | **Item**                                                                                                                                      | **Source**                       | **URL**                                             | **Acquired Date** |
 | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------------------------- | ----------------- |
