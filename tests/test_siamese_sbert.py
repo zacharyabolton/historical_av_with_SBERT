@@ -131,13 +131,15 @@ class TestSiameseSBERT:
         # https://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf [18]
         # and
         # Tyo Et. Al (2021) [15]
-        cls.loss_function = ContrastiveLoss(margin=cls.margin,
-                                            eps=cls.epsilon)
+        cls.loss_function = ContrastiveLoss(margin=cls.margin)
 
         # Instantiate Adam optimizer
         cls.optimizer = torch.optim.Adam(cls.model.parameters(),
                                          lr=INITIAL_LEARNING_RATE,
                                          eps=cls.epsilon)
+
+        # Reset any existing splits
+        LILADataset.reset_splits()
 
         # Insantiate PyTorch dataset object and dataloadeer with mock data
         # and toy parameters for testing
@@ -161,7 +163,6 @@ class TestSiameseSBERT:
         Trivial test to ensure SiameseSBERT can instantiate
         """
         assert isinstance(cls.model, SiameseSBERT)
-
     def test_encoder_exists(cls):
         """
         Trivial test to ensure SBERT encoder exists on `SiameseSBERT`
