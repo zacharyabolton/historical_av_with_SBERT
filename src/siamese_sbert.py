@@ -113,7 +113,7 @@ class SiameseSBERT(nn.Module):
 
         Adapted from...
         
-        [30] Lewis Tunstall, Leandro Von Werra, and Thomas Wolf. 2022.
+        [31] Lewis Tunstall, Leandro Von Werra, and Thomas Wolf. 2022.
         Natural language processing with transformers. “ O’Reilly Media,
         Inc.” Retrieved from
         https://books.google.com.br/books?id=nzxbEAAAQBAJ&lpg=PP1&ots=sUqiDWs3MI&dq=Natural%20Language%20Processing%20with%20Transformers%20%5BRevised%20Edition  # noqa E501
@@ -138,7 +138,8 @@ class SiameseSBERT(nn.Module):
 
         # Calculate the mean of token embeddings, ignoring padding tokens
         # Expand the 1D input mask to fit the token_embeddings of dim
-        # `tokens` * `token length`
+        # `tokens` * `token length`.
+        # Adapted from Tunstall et al. (2022) [31:276]
         input_mask_expanded = attention_mask.unsqueeze(-1).\
             expand(token_embeddings.size()).float()
 
@@ -151,7 +152,7 @@ class SiameseSBERT(nn.Module):
         # due to float imprecision
         sum_mask = torch.clamp(input_mask_expanded.sum(dim=1), min=1e-9)
 
-        # Calculate mean and normalize
+        # Calculate the mean
         mean_embeddings = sum_embeddings / sum_mask
 
         return mean_embeddings
