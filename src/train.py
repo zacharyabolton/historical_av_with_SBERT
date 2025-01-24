@@ -35,51 +35,92 @@ if device == 'mps':
     torch.mps.empty_cache()
 
 
-def save_results(run_dir, k, epoch_losses, args):
+def log_results(view_path,
+                out_path,
+                batch_losses,
+                batch_idx,
+                epoch_idx,
+                fold_idx,
+                durations):
     """
     A function to save the results of a full k-folds cross-validation
     training run on the SiameseSBERT model using the LILADataset.
 
-    :param run_dir: <Required> The directory to save the results files for
-    this entire k-folds run for.
-    :type run_dir: str
+    :param view_path: <Required> Path to the source view data.
+    :type view_path: str
 
-    :param k: <Required> The fold index data to save.
-    :type k: int
+    :param out_path: <Required> Path to the directory to save the results
+    files for this entire k-folds run for.
+    :type out_path: str
 
-    :param losses: <Required> A list of lists of batch losses per k fold
-    run.
-    :type losses: list
+    :param batch_losses: <Required> List of losses accumulated per batch
+    for the epoch thus far.
+    :type batch_losses: list
 
-    :param args: <Required> A dictionary mapping hyperparameters to their
-    values for a given k-fold run.
-    :type args: dict
+    :param batch_idx: <Required> The batch index.
+    :type batch_idx: int
+
+    :param epoch_idx: <Required> The epoch index.
+    :type epoch_idx: int
+
+    :param fold_idx: <Required> The fold index.
+    :type fold_idx: int
+
+    :param durations: <Required> List of durations accumulagted per batch
+    for the epoch thus far.
+    :type fold_idx: list
     """
-    if k == 0:
-        # Save run metadata
-        filename = "hyperparameters.txt"
-        filepath = os.path.join(run_dir, filename)
-        print('filepath:', filepath)
-        with open(filepath, 'w') as f:
-            f.write(json.dumps(args))
-            print(f"Hyperparameters saved to {filepath}.")
+    # Create view based directory
+    # Adapted from:
+    # https://stackoverflow.com/a/3925147
+    view_dir = os.path.basename(os.path.normpath(view_path))
+    view_log_path = os.path.join(out_path, view_dir)
+    if not os.path.exists(view_log_path):
+        os.mkdir(view_log_path)
 
-    # Create k based filename
-    filename = f"k_{k}_losses.csv"
-    filepath = os.path.join(run_dir, filename)
+    # Create fold based file
+    fold_file = f"k_{fold_idx}_losses.csv"
+    fold_file_path = os.path.join(view_log_path, fold_file)
 
     # CSV-ify losses and save to output dir
-    plain_losses = [[str(tensor.item()) for tensor in losses] for losses in epoch_losses]
-    with open(filepath, 'w') as f:
-        for i, losses in enumerate(plain_losses):
-            if i == len(plain_losses) - 1:
-                f.write(','.join(losses))
+    plain_losses = [str(tensor.item()) for tensor in batch_losses]
+
+    if os.path.exists(fold_file_path):
+        # If the file exists open it in read
+        fold_losses = []
+        with open(fold_file_path, 'r') as f:
+            fold_losses = f.read()
+            fold_losses = fold_losses.split('\n')
+            if epoch_idx == len(fold_losses) - 1:
+                # Overwrite last line with updated epoch losses
+                fold_losses[-1] = ','.join(plain_losses)
             else:
-                f.write(','.join(losses) + '\n')
-        print(f"Losses saved to {filepath}.")
+                # New epoch, create new line
+                fold_losses.append(','.join(plain_losses))
+        # Now overwrite it with the updated losses
+        with open(fold_file_path, 'w') as f:
+            f.write('\n'.join(fold_losses))
+    else:
+        # If the file doesn't exist open it in write
+        with open(fold_file_path, 'w+') as f:
+            f.write(','.join(plain_losses))
+
+    print(f"Losses saved to {fold_file_path}.")
+    avg_duration = sum(durations[-10:]) /\
+        min(len(durations), 10)
+    avg_loss = sum(batch_losses[-10:]) /\
+        min(len(batch_losses), 10)
+    print(f"Fold {fold_idx} > Epoch {epoch_idx} >"
+          f" Batch {batch_idx}")
+    print(f'Loss: {batch_losses[-1].item():.4f},'
+          f' 10AVG Loss: {avg_loss:.4f},'
+          f' 10AVG Time/Batch: {avg_duration:.2f}s')
 
 
-def train(batch_size,
+def train(view_path,
+          metadata_path,
+          out_path,
+          batch_size,
           accumulation_steps,
           chunk_size,
           margin,
@@ -89,6 +130,19 @@ def train(batch_size,
           num_epochs):
     """
     The main training loop for SiameseSBERT on LILADataset.
+
+    :param view_path: <Required> The path to the view's training data.
+    Expects three subdirectories of the form `A`, `notA`, `U` to hold
+    the authorial class' data.
+    :type view_path: str
+
+    :param metadata_path: <Required> The path to the 'metdata.csv' file
+    on the same level as the view directory.
+    :type metadata_path: str
+
+    :param out_path: <Required> The directory to save results of this run
+    to.
+    :type out_path: str
 
     :param batch_size: <Required> The actual batch size, before
     considering gradient accumulation.
@@ -126,19 +180,6 @@ def train(batch_size,
     SiameseSBERT model on the entire dataset.
     """
 
-    # SAVE RESULTS!
-    # Setup directories to store the results of each run
-    # Choose output directory and create if not already there
-    output_dir = "../model_out"
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-
-    # Create unique run dirname
-    current_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-    run_dir = os.path.join(output_dir, '_'.join(current_time.split()))
-    if not os.path.exists(run_dir):
-        os.mkdir(run_dir)
-
     # Reset any existing splits
     LILADataset.reset_splits()
 
@@ -155,8 +196,8 @@ def train(batch_size,
     """)
 
     # Instantiate the full LILA dataset
-    full_dataset = LILADataset('../data/normalized/undistorted',
-                               '../data/normalized/metadata.csv',
+    full_dataset = LILADataset(view_path,
+                               metadata_path,
                                cnk_size=chunk_size,
                                num_pairs=num_pairs,
                                num_splits=num_splits)
@@ -170,8 +211,6 @@ def train(batch_size,
         # Perform a full training cycle `num_splits` times, changing the
         # train/validation sets each time (K-folds cross-validation)
         for fold_idx in range(num_splits):
-            print(f"\n\nFOLD {fold_idx}")
-            print('---------------------------------')
             # Instantiate custom Siamese SBERT model and move to device
             model = SiameseSBERT(MODEL).to(device)
 
@@ -217,16 +256,10 @@ def train(batch_size,
             # Set model to training mode
             model.train()
 
-            # Create a list to store all losses
-            losses = []
-
-            for epoch in range(num_epochs):
-                print(f"\nEPOCH {epoch}")
+            for epoch_idx in range(num_epochs):
                 # Extract the train and validation datasets
                 train_dataset, val_dataset = full_dataset\
                     .get_train_val_datasets(fold_idx)
-                print(len(train_dataset), "train samples")
-                print(len(val_dataset), "val samples")
 
                 # Instantiate the dataloader for the train_dataset
                 train_dataloader = DataLoader(
@@ -236,16 +269,14 @@ def train(batch_size,
                     collate_fn=collate_fn,
                 )
 
-                print(len(train_dataloader), "batches")
-
-                # Create list to store epoch losses
-                epoch_losses = []
-
                 # Gradient Accumulation Implementation:
                 # Adapted from
                 # https://stackoverflow.com/a/78619879 [37]
                 # Initialize running total for gradients
                 optimizer.zero_grad()
+
+                # Create a list to save batch losses
+                batch_losses = []
 
                 # Iterate over the train_dataloader one batch at a time
                 for batch_idx, (batch_anchor,
@@ -286,7 +317,7 @@ def train(batch_size,
                                          labels) / accumulation_steps
                     # Save the batch loss
                     # unnormalized loss for reporting
-                    epoch_losses.append(loss * accumulation_steps)
+                    batch_losses.append(loss * accumulation_steps)
 
                     # Backpropogation pass
                     loss.backward()
@@ -314,41 +345,25 @@ def train(batch_size,
                     # Save the result
                     durations.append(duration)
 
-                    if batch_idx % 10 == 0:
-                        avg_duration = sum(durations[-10:]) /\
-                            min(len(durations), 10)
-                        avg_loss = sum(epoch_losses[-10:]) /\
-                            min(len(epoch_losses), 10)
-                        print(f'Batch {batch_idx}, '
-                              f'Loss: {loss.item():.4f}, '
-                              f'10-rolling avg Loss: {avg_loss:.4f}, '
-                              '10-rolling avg Time/Batch:'
-                              f' {avg_duration:.2f}s')
+                    # Save every hundred batches, or at the end of the
+                    # train loop
+                    if batch_idx % 100 == 0 or \
+                       batch_idx == len(train_dataloader) - 1:
+                        # LOG RESULTS!
+                        log_results(view_path,
+                                    out_path,
+                                    batch_losses,
+                                    batch_idx,
+                                    epoch_idx,
+                                    fold_idx,
+                                    durations)
 
                     start_time = time.time()
-
-                # Save epoch lossess to entire run losses list
-                losses.append(epoch_losses)
 
                 # Adapted from:
                 # https://machinelearningmastery.com/using-learning-rate-schedule-in-pytorch-training/  # noqa: E501
                 # Update the learning rate ahead of new epoch
                 scheduler.step()
-
-            # SAVE RESULTS OF THIS FOLD!
-            save_results(run_dir,
-                         fold_idx,
-                         losses,
-                         {
-                             "batch_size": batch_size,
-                             "accumulation_steps": accumulation_steps,
-                             "chunk_size": chunk_size,
-                             "margin": margin,
-                             "epsilon": epsilon,
-                             "num_pairs": num_pairs,
-                             "num_splits": num_splits,
-                             "num_epochs": num_epochs,
-                         })
 
     except KeyboardInterrupt:
         print("\nTraining interrupted by user")
@@ -387,6 +402,7 @@ def run_training_loop(args):
     `SiameseSBERT` model.
     :type args: argparse.Namespace
     """
+    dataset_path = args.dataset_path
     batch_size = args.batch_size
     accumulation_steps = args.accumulation_steps
     chunk_size = args.chunk_size
@@ -397,6 +413,7 @@ def run_training_loop(args):
     num_epochs = args.num_epochs
 
     # Verify types
+    assert type(dataset_path) is str
     assert type(batch_size) is int
     assert type(accumulation_steps) is int
     assert type(chunk_size) is int
@@ -407,6 +424,7 @@ def run_training_loop(args):
     assert type(num_epochs) is int
 
     # Verify some boundary conditions
+    assert os.path.exists(dataset_path)
     assert batch_size >= 1, ("ERROR: You chose a batch size of"
                              f" {batch_size}.\n Batch sizes less than 1"
                              " are not possible.")
@@ -431,17 +449,69 @@ def run_training_loop(args):
     assert num_epochs > 0, ("Epochs must be greater than zero."
                             f" {num_epochs} was passed.")
 
-    # Run training
-    train(
-        batch_size,
-        accumulation_steps,
-        chunk_size,
-        margin,
-        epsilon,
-        num_pairs,
-        num_splits,
-        num_epochs
-    )
+    undistorted_path = os.path.join(dataset_path, 'undistorted')
+    assert os.path.exists(undistorted_path), \
+        (f"The provided path {dataset_path} containes no subdirectory"
+         " named 'undistorted'. Please provide a path to a properly"
+         " formatted dataset directory. See help: `python train.py -h`.")
+    metadata_path = os.path.join(dataset_path, 'metadata.csv')
+    assert os.path.exists(metadata_path), \
+        (f"The provided metadata {metadata_path} does not exist. Please"
+         " ensure the root data view directory contains a 'metadata.csv'"
+         " file. See help: `python train.py -h`.")
+    # Create list to store all views to process
+    views = [undistorted_path]
+    for view_dir in os.listdir(dataset_path):
+        view_path = os.path.join(dataset_path, view_dir)
+        if view_dir != 'undistorted' and os.path.isdir(view_path):
+            assert view_dir[:8] == 'DV-SA-k-'\
+                or view_dir[:8] == 'DV-MA-k-', ("Your view directories"
+                                                " are not in the form"
+                                                " DV-<<S|M>>A-k-<<k>>."
+                                                " See help: `python"
+                                                " train.py -h`.")
+            views.append(view_path)
+
+    # SAVE RESULTS!
+    # Setup directories to store the results of each run
+    # Choose output directory and create if not already there
+    output_dir = "../model_out"
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
+    # Create unique run dirname
+    current_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+    out_path = os.path.join(output_dir, '_'.join(current_time.split()))
+    if not os.path.exists(out_path):
+        os.mkdir(out_path)
+
+    print(f"Created run output directory at: {out_path}")
+
+    hyperparameters = args.__dict__
+    hyperparameters["output_dir"] = out_path
+
+    # Save run hyperparameters
+    params_file = "hyperparameters.txt"
+    params_file_path = os.path.join(out_path, params_file)
+    with open(params_file_path, 'w') as f:
+        f.write(json.dumps(hyperparameters))
+    print(f"Hyperparameters saved to {params_file_path}.")
+
+    for view_path in sorted(views):
+        # Run training
+        train(
+            view_path,
+            metadata_path,
+            out_path,
+            batch_size,
+            accumulation_steps,
+            chunk_size,
+            margin,
+            epsilon,
+            num_pairs,
+            num_splits,
+            num_epochs
+        )
 
 
 if __name__ == '__main__':
@@ -451,6 +521,27 @@ if __name__ == '__main__':
     # get command line args
     parser = argparse.ArgumentParser(
         description='Train SiamesSBERT on LILADataset')
+
+    # Set the path to the dataset. Expects structure such as:
+    # .
+    # ├── undistorted
+    # │   ├── A
+    # │   ├── notA
+    # │   └── U
+    # ├── DV-MA-k-<<k>>
+    # ├── DV-SA-k-<<k>>
+    # ├── DV- etc...
+    # └── metadata.csv
+    parser.add_argument('dataset_path',
+                        type=str,
+                        help=("Set the path to the dataset. Expects a"
+                              " path to a directory whith at least one"
+                              " subdirectory named 'undistorted'"
+                              " containing 'A', 'notA', and 'U'"
+                              " sub-subirectories. Any further"
+                              " subdirectories must start 'DV-MA-' or"
+                              " 'DV-SA-' and and end 'k-<<k>>` where"
+                              " <<k>> is an integer greater than one."))
 
     # Set the batch size
     parser.add_argument('batch_size',
