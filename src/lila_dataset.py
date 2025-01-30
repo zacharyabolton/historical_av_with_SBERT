@@ -48,14 +48,14 @@ class LILADataset(Dataset):
     """
     _fold_splits = None
     _base_pairs = None
-    _num_splits = 5
+    _num_folds = 5
 
     def __init__(self,
                  data_dir,
                  metadata_path,
                  cnk_size,
                  num_pairs,
-                 num_splits=5,
+                 num_folds=5,
                  fold_idx=None,
                  training=True,
                  seed=None):
@@ -89,9 +89,9 @@ class LILADataset(Dataset):
         number for data-balancing purposes.
         :type num_pairs: int
 
-        :param num_splits: <Optional> Number of 'folds' to split the data
+        :param num_folds: <Optional> Number of 'folds' to split the data
         into for k-folds cross-validation.
-        :type num_splits: int
+        :type num_folds: int
 
         :param fold_idx: <Optional> Fold index to assign as validation
         split.
@@ -133,14 +133,14 @@ class LILADataset(Dataset):
                                            " supplied.")
         else:
             # Only generate pairs and splits if this is the first instance
-            assert num_splits > 1, ("This model is intended for use with"
-                                    " K-Folds Cross-Validation, which"
-                                    " requires `num_splits` greater than"
-                                    f" 1. {num_splits} was passed.")
-            assert num_splits < 11, ("`num_splits` greater than 10 will"
-                                     " result in validation sets under"
-                                     " 10% of the dataset."
-                                     f" {num_splits} was passed.")
+            assert num_folds > 1, ("This model is intended for use with"
+                                   " K-Folds Cross-Validation, which"
+                                   " requires `num_folds` greater than"
+                                   f" 1. {num_folds} was passed.")
+            assert num_folds < 11, ("`num_folds` greater than 10 will"
+                                    " result in validation sets under"
+                                    " 10% of the dataset."
+                                    f" {num_folds} was passed.")
             assert fold_idx is None, ("This is the first instance of"
                                       " LILADataset, intended for all"
                                       " pairs generation. `fold_idx` is"
@@ -177,10 +177,10 @@ class LILADataset(Dataset):
                 self._A_docs_cnked, self._notA_docs_cnked)
 
             # Save the input number of splits on the class level
-            LILADataset._num_splits = num_splits
+            LILADataset._num_folds = num_folds
 
             # Initialize KFold
-            kf = KFold(n_splits=LILADataset._num_splits, shuffle=True,
+            kf = KFold(n_splits=LILADataset._num_folds, shuffle=True,
                        random_state=seed)
 
             # Convert pairs to indices
@@ -197,9 +197,9 @@ class LILADataset(Dataset):
         # If fold_idx is provided, use only that fold's data
         if self.fold_idx is not None:
             assert 0 <= self.fold_idx <\
-                LILADataset._num_splits, ("`fold_idx must be between 0"
-                                          " and"
-                                          f" {LILADataset.num_splits-1}")
+                LILADataset._num_folds, ("`fold_idx must be between 0"
+                                         " and"
+                                         f" {LILADataset.num_folds-1}")
             train_idx, val_idx = LILADataset._fold_splits[self.fold_idx]
             if self.training:
                 self._pairs = [LILADataset._base_pairs[i]
@@ -215,7 +215,7 @@ class LILADataset(Dataset):
         """
         Reset the pairs and splits stored on the class level.
         """
-        cls.num_splits = 5
+        cls.num_folds = 5
         cls._fold_splits = None
         cls._base_pairs = None
 
@@ -594,8 +594,8 @@ class LILADataset(Dataset):
         :rtype: tuple
         """
         assert 0 <= fold_idx <\
-            LILADataset._num_splits, ("fold_idx must be between 0 and"
-                                      f" {LILADataset._num_splits-1}")
+            LILADataset._num_folds, ("fold_idx must be between 0 and"
+                                     f" {LILADataset._num_folds-1}")
 
         # Create new instances for training and validation
         train_dataset = LILADataset(
