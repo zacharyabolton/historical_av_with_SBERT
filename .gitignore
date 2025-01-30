@@ -166,3 +166,4 @@ src/prototype_debug.py
 *.virtual_documents
 .DS_Store
 /model_out
+/saved_experiments
