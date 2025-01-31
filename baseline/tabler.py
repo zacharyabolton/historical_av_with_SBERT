@@ -4,11 +4,11 @@ from bs4 import BeautifulSoup
 
 RE_P1P2 = re.compile(r"optimal p1/p2:\s*([\d.]+)\s+([\d.]+)")
 RE_SCORES = {
-    "auc":     re.compile(r"'auc': np\.float64\(([\d.]+)\)"),
-    "c@1":     re.compile(r"'c@1': ([\d.]+)"),
-    "f_05_u":  re.compile(r"'f_05_u': ([\d.]+)"),
-    "F1_opt":  re.compile(r"'F1': np\.float64\(([\d.]+)\)"),
-    "brier":  re.compile(r"'brier': np\.float64\(([\d.]+)\)"),
+    "auc": re.compile(r"'auc': np\.float64\(([\d.]+)\)"),
+    "c@1": re.compile(r"'c@1': ([\d.]+)"),
+    "f_05_u": re.compile(r"'f_05_u': ([\d.]+)"),
+    "F1_opt": re.compile(r"'F1': np\.float64\(([\d.]+)\)"),
+    "brier": re.compile(r"'brier': np\.float64\(([\d.]+)\)"),
     "overall": re.compile(r"'overall': np\.float64\(([\d.]+)\)")
 }
 RE_DEV = re.compile(r"Dev results.*F1=([\d.]+)\s*at th=([\d.\-e]+)")
@@ -69,18 +69,18 @@ def parse_training_metrics(html_file):
                         th_dev = None
 
                 results.append({
-                    "Dataset":  dataset_name,
-                    "k":        k_val,
-                    "p1":       p1,
-                    "p2":       p2,
-                    "auc":      auc,
-                    "c@1":      c_at_1,
-                    "f_05_u":   f05u,
-                    "F1_opt":   F1_opt,
-                    "brier":    brier,
-                    "overall":  overall,
-                    "F1_dev":   F1_dev,
-                    "th_dev":   th_dev
+                    "Dataset": dataset_name,
+                    "k": k_val,
+                    "p1": p1,
+                    "p2": p2,
+                    "auc": auc,
+                    "c@1": c_at_1,
+                    "f_05_u": f05u,
+                    "F1_opt": F1_opt,
+                    "brier": brier,
+                    "overall": overall,
+                    "F1_dev": F1_dev,
+                    "th_dev": th_dev
                 })
 
     df = pd.DataFrame(results)
