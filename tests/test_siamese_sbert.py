@@ -109,11 +109,15 @@ class TestSiameseSBERT:
         cls.paths, cls.canonical_class_labels = generate_test_data(
             cls.test_data_directory, cls.dataset, cls.metadata_rows)
 
-        # Send all Tensor operations to mps if available, and cpu if not
-        # TODO: Get this to work on GPU systems as well (CUDA)
-        cls.device = "mps" if torch.backends.mps.is_available() else "cpu"
-        if cls.device == 'mps':
-            torch.mps.empty_cache()
+        # Parallelization/Concurency
+        # Use CUDA if available, else use MPS if available. Fallback is
+        # CPU
+        cls.device = torch.device("cuda" if torch.cuda.is_available()
+                                  else (
+                                    "mps"
+                                    if torch.backends.mps.is_available()
+                                    else "cpu"
+                                  ))
 
         # Hyperparameters
         cls.batch_size = 32
@@ -123,8 +127,17 @@ class TestSiameseSBERT:
         cls.epsilon = 1e-6  # Same as Ibrahim et al. (2023) [7:10]
         cls.margin = 1
 
+        # Clear GPU cache before instantiating model
+        # Clear cache initially
+        if cls.device == 'mps':
+            torch.mps.empty_cache()
+            if hasattr(torch.mps, 'synchronize'):
+                torch.mps.synchronize()
+        if cls.device == "cuda":
+            torch.cuda.empty_cache()
+
         # Instantiate test Siamese SBERT model and move to device
-        cls.model = SiameseSBERT(MODEL).to(cls.device)
+        cls.model = SiameseSBERT(MODEL, cls.device).to(cls.device)
 
         # Instantiate custom contrastive loss function
         # TODO: Consider implementing 'modified contrastive loss' from
@@ -163,6 +176,7 @@ class TestSiameseSBERT:
         Trivial test to ensure SiameseSBERT can instantiate
         """
         assert isinstance(cls.model, SiameseSBERT)
+
     def test_encoder_exists(cls):
         """
         Trivial test to ensure SBERT encoder exists on `SiameseSBERT`
