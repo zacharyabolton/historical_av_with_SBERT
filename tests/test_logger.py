@@ -9,6 +9,8 @@ import shutil
 import json
 import torch
 import pandas as pd
+import math
+import numpy as np
 
 # Add src directory to sys.path
 # Adapted from Taras Alenin's answer on StackOverflow at:
@@ -30,6 +32,15 @@ class TestLogger:
     """
     @classmethod
     def setup_class(cls):
+        # Parallelization/Concurency
+        # Use CUDA if available, else use MPS if available. Fallback is
+        # CPU
+        cls.device = torch.device("cuda" if torch.cuda.is_available()
+                                  else (
+                                    "mps"
+                                    if torch.backends.mps.is_available()
+                                    else "cpu"
+                                  ))
         cls.dataset = [
             'foo bar',  # A-0
             'foo bar',  # A-1
@@ -92,12 +103,42 @@ class TestLogger:
             cls.test_data_directory, cls.dataset, cls.metadata_rows)
 
         cls.expirement_name = 'test_test_experiment'
+        cls.experiment_name = cls.expirement_name
+        cls.dataset_path = os.path.abspath(cls.paths['normalized_dir'])
+        cls.batch_size = 4
+        cls.accumulation_steps = 1
+        cls.chunk_size = 4
+        cls.margin = 0.5
+        cls.epsilon = 0.000001
+        cls.num_pairs = 32
+        cls.num_folds = 2
+        cls.num_epochs = 2
+        cls.initial_lr = 0.00001
+        cls.seed = 0
+        cls.max_norm = None
+        cls.base_out_path = '../data/test/model_out'
+        cls.run_out_path = os.path.join(cls.base_out_path,
+                                        cls.experiment_name)
         cls.test_hyperparameters = {
-            'foo': 'bar',
-            'experiment_name': cls.expirement_name}
-        cls.test_output_directory = '../data/test/model_out'
+            'experiment_name': cls.expirement_name,
+            'dataset_path': cls.dataset_path,
+            'batch_size': cls.batch_size,
+            'accumulation_steps': cls.accumulation_steps,
+            'chunk_size': cls.chunk_size,
+            'margin': cls.margin,
+            'epsilon': cls.epsilon,
+            'num_pairs': cls.num_pairs,
+            'num_folds': cls.num_folds,
+            'num_epochs': cls.num_epochs,
+            'initial_lr': cls.initial_lr,
+            'seed': cls.seed,
+            'max_norm': cls.max_norm,
+            'run_out_path': cls.run_out_path
+        }
+        cls.train_batch_duration = 100
+        cls.val_batch_duration = 60
         cls.logger = Logger(cls.paths['normalized_dir'],
-                            cls.test_output_directory,
+                            cls.base_out_path,
                             cls.test_hyperparameters)
 
     @classmethod
@@ -108,7 +149,7 @@ class TestLogger:
 
         # Remove everything after tests have run
         destroy_test_data(cls.test_data_directory)
-        shutil.rmtree(cls.test_output_directory, ignore_errors=True)
+        shutil.rmtree(cls.base_out_path, ignore_errors=True)
 
     def test_logger_exists(cls):
         """
@@ -122,240 +163,228 @@ class TestLogger:
         Test that the structure of the output directory created by Logger
         is correct.
         """
-        assert os.path.exists(cls.test_output_directory)
-        assert os.path.exists(cls.logger.out_path)
+        assert os.path.exists(cls.base_out_path)
+        assert os.path.exists(cls.logger.base_out_path)
+        assert os.path.exists(cls.run_out_path)
         assert os.path.exists(cls.logger.run_out_path)
+        assert cls.base_out_path == cls.logger.base_out_path
+        assert cls.run_out_path == cls.logger.run_out_path
 
     def test_hyperparameters(cls):
         """
         Test that the hyperparameters.json file is created with correct
         contents.
         """
-        hyperparameters_path = os.path.join(cls.logger.run_out_path,
+        hyperparameters_path = os.path.join(cls.run_out_path,
                                             'hyperparameters.json')
         assert os.path.exists(hyperparameters_path)
         with open(hyperparameters_path, 'r') as f:
             jsoncontent = json.loads(f.read())
 
-        cls.test_hyperparameters['out_path'] = cls.logger.run_out_path
-
         assert jsoncontent == cls.test_hyperparameters
 
-    def test_logging(cls):
+    def process_view(cls, view):
         """
-        Test the core logging functionality
+        Run a full mock-'logging-loop' simulating the way training/eval
+        occurs, in order to generate mock data to test on.
+
+        :returns folds_losses: A nested list of losses by folds accrued
+        during mock train/eval. This is used by some methods for testing
+        as the logger clears it's internal folds_losses after generating
+        summary evaluation stats.
+        :type list:
         """
-        # Test that the file can be updated with a first round of losses
+        folds_losses = []
+        view_path = os.path.join(cls.dataset_path, view)
+        train_durations = []
+        val_durations = []
+        for fold_idx in range(cls.num_folds):
+            fold_losses = []
+            for epoch_idx in range(cls.num_epochs):
+                # Mock train
+                num_train_pairs = round(cls.num_pairs *
+                                        ((cls.num_folds - 1)/
+                                         cls.num_folds))
+                num_train_batches = math.ceil(num_train_pairs /
+                                              cls.batch_size)
+                num_val_pairs = cls.num_pairs - num_train_pairs
+                num_val_batches = math.ceil(num_val_pairs /
+                                            cls.batch_size)
+
+                for batch_idx in range(num_train_batches):
+                    total_batches = (num_train_batches +
+                                     num_val_batches) * cls.num_epochs
+                    fold_losses.append((epoch_idx +
+                                        batch_idx + 1e-04)/total_batches)
+                    train_durations.append(cls.train_batch_duration)
+                    # Mock process batch
+                    cls.logger.log_train_results(
+                        view_path,
+                        torch.tensor(fold_losses),
+                        batch_idx,
+                        epoch_idx,
+                        fold_idx,
+                        train_durations,
+                        num_train_batches
+                    )
+                    cls.logger.echo_stats(
+                        cls.batch_size,
+                        cls.num_folds,
+                        cls.num_epochs,
+                        cls.num_pairs,
+                        train_durations,
+                        val_durations,
+                        view_path,
+                        fold_idx,
+                        epoch_idx,
+                        batch_idx,
+                        True,
+                        num_train_batches,
+                        num_val_batches,
+                        cls.device
+                    )
+
+                for batch in range(num_val_batches):
+                    val_similarities = [1
+                                        for i in range(batch + 1)]
+                    val_truths = [i % 2
+                                  for i in range(batch + 1)]
+                    val_durations.append(cls.val_batch_duration)
+                    # Mock eval
+                    cls.logger.log_val_results(
+                        val_similarities,
+                        val_truths,
+                        view_path,
+                        fold_idx,
+                        epoch_idx,
+                        cls.num_epochs
+                    )
+
+                    cls.logger.echo_stats(
+                        cls.batch_size,
+                        cls.num_folds,
+                        cls.num_epochs,
+                        cls.num_pairs,
+                        train_durations,
+                        val_durations,
+                        view_path,
+                        fold_idx,
+                        epoch_idx,
+                        batch_idx,
+                        False,
+                        num_train_batches,
+                        num_val_batches,
+                        cls.device
+                    )
+
+            folds_losses.append(fold_losses)
+
+        cls.logger.gen_summary_loss_plot(
+            view_path,
+            cls.num_epochs,
+            num_train_batches
+        )
+        cls.logger.gen_summary_eval_metrics(
+            view_path,
+            cls.num_epochs
+        )
+
+        return folds_losses
+
+    def test_view_dirs_created(cls):
+        """
+        Test that view based output directories are correctly created.
+        """
+        views = [
+            'DV-MA-k-0',
+            'DV-MA-k-2',
+            'DV-MA-k-8',
+            'DV-SA-k-0',
+            'DV-SA-k-2',
+            'DV-SA-k-8',
+            'undistorted'
+        ]
+
+        for view_path in views:
+            cls.process_view(view_path)
+
+        view_dirs_created = []
+        for view_dir in os.listdir(cls.run_out_path):
+            if not view_dir.startswith('.') and\
+               not view_dir.endswith('.json'):
+                view_dirs_created.append(view_dir)
+
+        view_dirs_created = sorted(view_dirs_created)
+
+        assert view_dirs_created == views
+
+    def test_loss_imgs_created(cls):
+        """
+        Test that the loss plot and confusion matrices are created
+        correctly.
+        """
         view_path = 'undistorted'
-        batch_idx = 3
-        epoch_losses = torch.Tensor([float(i)
-                                     for i in range((batch_idx + 1))])
-        epoch_idx = 0
-        fold_idx = 0
-        durations = [42 for i in range(batch_idx + 1)]
-
-        cls.logger.log_train_results(view_path, epoch_losses, batch_idx,
-                                     epoch_idx, fold_idx, durations, 8)
-
-        path_to_losses_png = os.path.join(cls.logger.run_out_path,
-                                          view_path,
+        cls.process_view('undistorted')
+        for fold_idx in range(cls.num_folds):
+            path_to_losses_png = os.path.join(cls.run_out_path,
+                                              view_path,
+                                              (f"{cls.expirement_name}"
+                                               f"_fold_{fold_idx}"
+                                               "_train_losses.png"))
+        assert os.path.exists(path_to_losses_png)
+        path_to_cm_hedged_png = os.path.join(cls.run_out_path,
+                                             view_path,
+                                             (f"{cls.expirement_name}"
+                                              "_fold_0"
+                                              "_eval_cm_hedged.png"))
+        assert os.path.exists(path_to_cm_hedged_png)
+        path_to_cm_true_png = os.path.join(cls.run_out_path,
+                                           view_path,
                                            (f"{cls.expirement_name}"
-                                            f"_fold_{fold_idx}"
-                                            "_train_losses.png"))
+                                            "_fold_0_eval_cm_true.png"))
+        assert os.path.exists(path_to_cm_true_png)
+        path_to_all_train_losses = os.path.join(
+            cls.run_out_path, view_path,
+            f"{cls.expirement_name}_all_train_losses.png")
+        assert os.path.exists(path_to_all_train_losses)
 
-        assert os.path.exists(path_to_losses_png)
+    def test_numpy_losses_saved(cls):
+        """
+        Test that accrued losses are saved in full in numpy (.npy) files,
+        and have the correct shape.
+        """
+        view_path = 'undistorted'
+        folds_losses = cls.process_view('undistorted')
+        path_to_numpy = os.path.join(
+            cls.run_out_path, view_path,
+            f"{cls.expirement_name}_raw_losses.npy")
+        assert os.path.exists(path_to_numpy)
+        loaded_losses = np.load(path_to_numpy)
+        print("folds_losses")
+        print(np.array(folds_losses))
+        print("loaded_losses")
+        print(loaded_losses)
+        assert np.array(folds_losses).shape == loaded_losses.shape
 
-        assert len(cls.logger.folds_losses) == 1
-        assert len(cls.logger.folds_losses[0]) == len(epoch_losses)
-        assert cls.logger.folds_losses[0] == [tensor.item()
-                                              for tensor in epoch_losses]
-
-        # Test that a second round of losses, on the same fold and epoch
-        # can be updated
-        batch_idx = 7
-        epoch_losses = torch.Tensor([float(i)
-                                     for i in range(batch_idx + 1)])
-        durations = [42 for i in range(batch_idx + 1)]
-        cls.logger.log_train_results(view_path, epoch_losses, batch_idx,
-                                     epoch_idx, fold_idx, durations, 8)
-
-        assert len(cls.logger.folds_losses) == 1
-        assert len(cls.logger.folds_losses[0]) == len(epoch_losses)
-        assert cls.logger.folds_losses[0] == [tensor.item()
-                                              for tensor in epoch_losses]
-
-        # Test that a third round of losses, on the same fold but new
-        # epoch can be updated
-        batch_idx = 3
-        prev_epoch_losses = torch.Tensor([float(i) for i in range(8)])
-        fold_losses = torch.cat(
-            (prev_epoch_losses,
-             torch.Tensor([float(i) for i in range(batch_idx + 1)])), 0)
-        epoch_idx = 1
-        durations = [42 for i in range(len(fold_losses))]
-        cls.logger.log_train_results(view_path, fold_losses, batch_idx,
-                                     epoch_idx, fold_idx, durations, 8)
-
-        assert len(cls.logger.folds_losses) == 1
-        assert cls.logger.folds_losses[0] == [tensor.item()
-                                              for tensor
-                                              in fold_losses]
-
-        # Test that a forth round of losses, on the previous fold and
-        # epoch can be updated
-        batch_idx = 7
-        prev_epoch_losses = torch.Tensor([float(i) for i in range(8)])
-        fold_losses = torch.cat(
-            (prev_epoch_losses,
-             torch.Tensor([float(i) for i in range(batch_idx + 1)])), 0)
-        epoch_idx = 1
-        durations = [42 for i in range(len(fold_losses))]
-        cls.logger.log_train_results(view_path, fold_losses, batch_idx,
-                                     epoch_idx, fold_idx, durations, 8)
-
-        assert len(cls.logger.folds_losses) == 1
-        assert cls.logger.folds_losses[0] == [tensor.item()
-                                              for tensor
-                                              in fold_losses]
-
-        # Test that a fifth round of losses, on the a new fold can be
-        # updated
-        prev_fold_losses = fold_losses
-        batch_idx = 3
-        fold_losses = torch.Tensor([float(i)
-                                    for i in range(batch_idx + 1)])
-        epoch_idx = 0
-        fold_idx = 1
-        durations = [42 for i in range(batch_idx + 1)]
-        cls.logger.log_train_results(view_path, fold_losses, batch_idx,
-                                     epoch_idx, fold_idx, durations, 8)
-
-        path_to_losses_png = os.path\
-            .join(cls.logger.run_out_path, 'undistorted',
-                  (f"{cls.expirement_name}"
-                   f"_fold_{fold_idx}_train_losses.png"))
-        assert os.path.exists(path_to_losses_png)
-
-        assert len(cls.logger.folds_losses) == 2
-        assert cls.logger.folds_losses[0] == [tensor.item()
-                                              for tensor
-                                              in prev_fold_losses]
-        assert cls.logger.folds_losses[1] == [tensor.item()
-                                              for tensor
-                                              in fold_losses]
-
-        # Test that a sixth round of losses, on the the second fold can be
-        # updated
-        batch_idx = 7
-        epoch_losses = torch.Tensor([float(i)
-                                     for i in range(batch_idx + 1)])
-        epoch_idx = 0
-        durations = [42 for i in range(batch_idx + 1)]
-        cls.logger.log_train_results(view_path, epoch_losses, batch_idx,
-                                     epoch_idx, fold_idx, durations, 8)
-
-        assert len(cls.logger.folds_losses) == 2
-        assert cls.logger.folds_losses[0] == [tensor.item()
-                                              for tensor
-                                              in prev_fold_losses]
-        assert cls.logger.folds_losses[1] == [tensor.item()
-                                              for tensor in epoch_losses]
-
-        # Test that a summary plot can be created
-        prev_epoch_losses = epoch_losses
-        batch_idx = 3
-        epoch_losses = torch.Tensor([float(i)
-                                     for i in range(batch_idx + 1)])
-        epoch_idx = 1
-        durations = [42 for i in range(batch_idx + 1)]
-        cls.logger.log_train_results(view_path, epoch_losses, batch_idx,
-                                     epoch_idx, fold_idx, durations, 8)
-        batch_idx = 7
-        epoch_losses = torch.Tensor([float(i)
-                                     for i in range(batch_idx + 1)])
-        epoch_losses = torch.cat((prev_epoch_losses, epoch_losses), 0)
-        epoch_idx = 1
-        durations = [42 for i in range(batch_idx + 1)]
-        cls.logger.log_train_results(view_path, epoch_losses, batch_idx,
-                                     epoch_idx, fold_idx, durations, 8)
-        cls.logger.gen_summary_loss_plot('undistorted', 2, 8)
-
-        path_to_losses_png = os.path\
-            .join(cls.logger.run_out_path, 'undistorted',
-                  f'{cls.expirement_name}_all_train_losses.png')
-        assert os.path.exists(path_to_losses_png)
-
-        # Test eval logging
-        cls.logger.log_val_results([0.9, 0.9, 0.1, 0.1],
-                                   [1, 0, 1, 0],
-                                   view_path,
-                                   0)
-        fold_0_cm_hedged_file = (f'{cls.expirement_name}_'
-                                 'fold_0_eval_cm_hedged.png')
-        fold_0_cm_true_file = (f'{cls.expirement_name}_'
-                               'fold_0_eval_cm_true.png')
-        fold_0_cm_hedged_path = os.path.join(cls.logger.run_out_path,
-                                             'undistorted',
-                                             fold_0_cm_hedged_file)
-        fold_0_cm_true_path = os.path.join(cls.logger.run_out_path,
-                                           'undistorted',
-                                           fold_0_cm_true_file)
-        assert os.path.exists(fold_0_cm_hedged_path)
-        assert os.path.exists(fold_0_cm_true_path)
-        hedged_scores_file = (f'{cls.expirement_name}'
-                              '_all_eval_hedged_scores.csv')
-        true_scores_file = (f'{cls.expirement_name}'
-                            '_all_eval_true_scores.csv')
-        hedged_scores_path = os.path.join(cls.logger.run_out_path,
-                                          'undistorted',
-                                          hedged_scores_file)
-        true_scores_path = os.path.join(cls.logger.run_out_path,
-                                        'undistorted',
-                                        true_scores_file)
-        assert os.path.exists(hedged_scores_path)
-        assert os.path.exists(true_scores_path)
-        hedged_scores_df = pd.read_csv(hedged_scores_path, index_col=None)
-        true_scores_df = pd.read_csv(true_scores_path, index_col=None)
-        rows, columns = hedged_scores_df.shape
-        assert rows == 1
-        assert columns == 9
-        rows, columns = true_scores_df.shape
-        assert len(true_scores_df) == 1
-        assert len(true_scores_df.columns) == 9
-
-        cls.logger.log_val_results([0.9, 0.9, 0.1, 0.1],
-                                   [0, 0, 1, 1],
-                                   view_path,
-                                   1)
-        fold_1_cm_hedged_file = (f'{cls.expirement_name}'
-                                 '_fold_1_eval_cm_hedged.png')
-        fold_1_cm_true_file = (f'{cls.expirement_name}'
-                               '_fold_1_eval_cm_true.png')
-        fold_1_cm_hedged_path = os.path.join(cls.logger.run_out_path,
-                                             'undistorted',
-                                             fold_1_cm_hedged_file)
-        fold_1_cm_true_path = os.path.join(cls.logger.run_out_path,
-                                           'undistorted',
-                                           fold_1_cm_true_file)
-        assert os.path.exists(fold_1_cm_hedged_path)
-        assert os.path.exists(fold_1_cm_true_path)
-
-        hedged_scores_df = pd.read_csv(hedged_scores_path, index_col=None)
-        true_scores_df = pd.read_csv(true_scores_path, index_col=None)
-        rows, columns = hedged_scores_df.shape
-        assert rows == 2
-        assert columns == 9
-        rows, columns = true_scores_df.shape
-        assert len(true_scores_df) == 2
-        assert len(true_scores_df.columns) == 9
-
-        # Check that summary scores are created
-        cls.logger.gen_summary_eval_metrics(view_path)
-        hedged_scores_df = pd.read_csv(hedged_scores_path, index_col=None)
-        true_scores_df = pd.read_csv(true_scores_path, index_col=None)
-        rows, columns = hedged_scores_df.shape
-        assert rows == 3
-        assert columns == 9
-        rows, columns = true_scores_df.shape
-        assert len(true_scores_df) == 3
-        assert len(true_scores_df.columns) == 9
+    def test_eval_metrics_saved(cls):
+        """
+        Test that the evaluation metrics are saved correctly in .csv
+        files.
+        """
+        view_path = 'undistorted'
+        cls.process_view('undistorted')
+        path_to_hedged_metrics = os.path.join(cls.run_out_path, view_path,
+                                              (f"{cls.expirement_name}"
+                                               "_all_eval_"
+                                               "hedged_scores.csv"))
+        path_to_true_metrics = os.path.join(cls.run_out_path, view_path,
+                                            (f"{cls.expirement_name}"
+                                             "_all_eval_"
+                                             "true_scores.csv"))
+        assert os.path.exists(path_to_hedged_metrics)
+        assert os.path.exists(path_to_true_metrics)
+        hedged_metrics = pd.read_csv(path_to_hedged_metrics,
+                                     index_col=None)
+        true_metrics = pd.read_csv(path_to_true_metrics, index_col=None)
+        assert len(hedged_metrics) == (cls.num_folds * cls.num_epochs) + 1
+        assert len(true_metrics) == (cls.num_folds * cls.num_epochs) + 1
