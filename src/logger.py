@@ -30,7 +30,7 @@ class Logger():
     of training runs to disk.
     """
 
-    def __init__(self, dataset_path, out_path, hyperparameters):
+    def __init__(self, dataset_path, base_out_path, hyperparameters):
         """
         The constructor for the logger, responsible for setting up
         members which the `log_train_results` and `log_eval_results`
@@ -41,10 +41,10 @@ class Logger():
         the calling routine will be training on.
         :type dataset_path: str
 
-        :param out_path: <Required> Path to the root output directory,
-        wherin Logger will create a sub-directory for storing the results
-        of the given run.
-        :type out_path: str
+        :param base_out_path: <Required> Path to the root output
+        directory, wherin Logger will create a sub-directory for storing
+        the results of the given run.
+        :type base_out_path: str
 
         :param hyperparameters: <Required> Dict of all hyperparameters for
         this run.
@@ -59,7 +59,7 @@ class Logger():
                 self.num_views += 1
         # Get instantiation time for time calcs
         self.start_time = time.time()
-        self.out_path = out_path
+        self.base_out_path = base_out_path
         self.hyperparameters = hyperparameters
         self.experiment_name = self.hyperparameters['experiment_name']
 
@@ -91,16 +91,16 @@ class Logger():
         # SAVE RESULTS!
         # Setup directories to store the results of each run
         # Choose output directory and create if not already there
-        if not os.path.exists(out_path):
-            os.mkdir(out_path)
+        if not os.path.exists(base_out_path):
+            os.mkdir(base_out_path)
 
-        self.run_out_path = os.path.join(out_path, self.experiment_name)
+        self.run_out_path = os.path.join(base_out_path, self.experiment_name)
         assert not os.path.exists(self.run_out_path), \
             (f"Experiment with name {self.experiment_name} already"
              " exists!")
         os.mkdir(self.run_out_path)
 
-        self.hyperparameters["out_path"] = os.path.abspath(
+        self.hyperparameters["run_out_path"] = os.path.abspath(
             self.run_out_path)
         self.hyperparameters["dataset_path"] = os.path.abspath(
             self.dataset_path)
@@ -121,7 +121,9 @@ class Logger():
         """
         Method to reset validation scores for a new 'view' run.
         """
-        self.folds_hedged_scores = pd.DataFrame(columns=['fold',
+        self.folds_hedged_scores = pd.DataFrame(columns=['experiment',
+                                                         'fold',
+                                                         'epoch',
                                                          'auc',
                                                          'c@1',
                                                          'f_05_u',
@@ -129,7 +131,9 @@ class Logger():
                                                          'brier',
                                                          'overall',
                                                          'sub_overall'])
-        self.folds_true_scores = pd.DataFrame(columns=['fold',
+        self.folds_true_scores = pd.DataFrame(columns=['experiment',
+                                                       'fold',
+                                                       'epoch',
                                                        'auc',
                                                        'c@1',
                                                        'f_05_u',
@@ -137,6 +141,7 @@ class Logger():
                                                        'brier',
                                                        'overall',
                                                        'sub_overall'])
+
 
     def log_train_results(self,
                           view_path,
@@ -247,7 +252,8 @@ class Logger():
                    batch_idx,
                    training,
                    num_train_batches,
-                   num_val_batches):
+                   num_val_batches,
+                   device):
         """
         Estimate remaining time for the full training run.
 
@@ -304,6 +310,10 @@ class Logger():
         :param num_val_batches: <Required> The number of batches in each
         validation phase.
         :type num_val_batches: int
+
+        :param device: <Required> The device to run tensor operations on
+        for parallelization/concurrency utlization: 'cuda', 'mps', 'cpu'.
+        :type device: str
         """
         # Get view name for display
         view = os.path.basename(os.path.normpath(view_path))
@@ -404,6 +414,14 @@ class Logger():
             avg_10_loss = round(sum(last_ten_losses) /
                                 len(last_ten_losses), 3)
 
+        if device == "cuda":
+            mem_allocated = torch.cuda.memory_allocated()/1e9
+            mem_cached = torch.cuda.memory_reserved()/1e9
+            gpu_suffix = (f"  •  GPU {mem_allocated:.1f}GB"
+                          f"/{mem_cached:.1f}GB")
+        else:
+            gpu_suffix = "" 
+
         # Echo out
         if training:
             print(f"TRAIN: View {view:>13}  •  "
@@ -414,7 +432,8 @@ class Logger():
                   f"Elapsed {dys_elapsed:>2}:{hrs_elapsed:02}:"
                   f"{min_elapsed:02}:{sec_elapsed:02}"
                   f" Remain {dys_remain:>2}:{hrs_remain:02}:"
-                  f"{min_remain:02}:{sec_remain:02}")
+                  f"{min_remain:02}:{sec_remain:02}"
+                  f"{gpu_suffix}")
         else:
             has_rows = len(self.folds_hedged_scores) > 0
             t_overall = self.folds_true_scores.iloc[-1]['overall']\
@@ -434,7 +453,8 @@ class Logger():
                   f"Elapsed {dys_elapsed:>2}:{hrs_elapsed:02}:"
                   f"{min_elapsed:02}:{sec_elapsed:02}"
                   f" Remain {dys_remain:>2}:{hrs_remain:02}:"
-                  f"{min_remain:02}:{sec_remain:02}")
+                  f"{min_remain:02}:{sec_remain:02}"
+                  f"{gpu_suffix}")
 
     def gen_summary_loss_plot(self, view_path, num_epochs,
                               num_batches_per_epoch):
@@ -756,7 +776,7 @@ class Logger():
             truths_filtered[truths_filtered >= 0.5] = 1
             truths_filtered[truths_filtered < 0.5] = 0
             hedged_confusion_matrix = metrics.confusion_matrix(
-                truths_filtered, sims_filtered)
+                truths_filtered, sims_filtered, labels=[0, 1])
             cm_display = metrics.ConfusionMatrixDisplay(
                 confusion_matrix=hedged_confusion_matrix,
                 display_labels=[0, 1])
@@ -794,7 +814,7 @@ class Logger():
             truths_filtered[truths_filtered >= 0.5] = 1
             truths_filtered[truths_filtered < 0.5] = 0
             true_confusion_matrix = metrics.confusion_matrix(
-                truths_filtered, sims_filtered)
+                truths_filtered, sims_filtered, labels=[0, 1])
             cm_display = metrics.ConfusionMatrixDisplay(
                 confusion_matrix=true_confusion_matrix,
                 display_labels=[0, 1])
