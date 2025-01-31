@@ -51,7 +51,7 @@ class SiameseSBERT(nn.Module):
     PyTorch.
     """
 
-    def __init__(self, model_name):
+    def __init__(self, model_name, device):
         """
         Initializes a Siamese SBERT model based on a pre-trained model
         from the `transformers` library. In this case, this pre-trained
@@ -60,10 +60,17 @@ class SiameseSBERT(nn.Module):
         :param model_name: <Required> The name of the pre-trained model
         from the `transformers` library.
         :type model_name: string
+
+        :param device: <Required> The device to run tensor operations on
+        for parallelization/concurrency utlization: 'cuda', 'mps', 'cpu'.
+        :type device: str
         """
 
         super(SiameseSBERT, self).__init__()
+        self._device = device
         self.encoder = AutoModel.from_pretrained(model_name)
+        if device == 'cuda' or device == 'mps':
+           self.encoder.config.use_cache = True
 
     def forward(self,
                 input_ids_anchor,
