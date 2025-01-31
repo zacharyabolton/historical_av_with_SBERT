@@ -11,19 +11,31 @@ import random
 import numpy as np
 from lila_dataset import LILADataset, collate_fn
 from siamese_sbert import SiameseSBERT, ContrastiveLoss
+from torch.cuda.amp import GradScaler, autocast
 
 # Parallelization/Concurency
-device = (
-    "mps"
-    if torch.backends.mps.is_available()
-    else "cpu"
-)
-
-# Clear MPS cache initially
-if device == 'mps':
+# Use CUDA if available, else use MPS if available. Fallback is CPU
+device = torch.device("cuda" if torch.cuda.is_available()
+                      else (
+                        "mps"
+                        if torch.backends.mps.is_available()
+                        else "cpu"
+                      ))
+NUM_WORKERS = 0
+PIN_MEMORY = False
+# Clear cache initially
+if device == "cuda":
+    torch.cuda.empty_cache()
+    # Use prefetching if cuda is available
+    NUM_WORKERS = 4
+    PIN_MEMORY = True
+elif device == 'mps':
     torch.mps.empty_cache()
     if hasattr(torch.mps, 'synchronize'):
         torch.mps.synchronize()
+    # Use prefetching if mps is available
+    NUM_WORKERS = 4
+    PIN_MEMORY = True
 
 
 def train_epoch(model,
@@ -160,26 +172,48 @@ def train_epoch(model,
         batch_other = {k: v.to(device)
                        for k, v in batch_other.items()}
         labels = labels.to(device)
-
-        # Forward pass
-        anchor_embedding, other_embedding = model(
-            batch_anchor['input_ids'],
-            batch_anchor['attention_mask'],
-            batch_other['input_ids'],
-            batch_other['attention_mask']
-        )
-
-        # Calculate the contrastive loss of this batch and
-        # normalize by accumulation steps
-        loss = loss_function(anchor_embedding,
-                             other_embedding,
-                             labels) / accumulation_steps
+        
+        # If cuda is available, use mixed precision training
+        if device == "cuda":
+            with autocast():
+                # Forward pass
+                anchor_embedding, other_embedding = model(
+                    batch_anchor['input_ids'],
+                    batch_anchor['attention_mask'],
+                    batch_other['input_ids'],
+                    batch_other['attention_mask']
+                )
+                # Calculate the contrastive loss of this batch and
+                # normalize by accumulation steps
+                loss = loss_function(anchor_embedding,
+                                     other_embedding,
+                                     labels) / accumulation_steps
+        else:
+            # Forward pass
+            anchor_embedding, other_embedding = model(
+                batch_anchor['input_ids'],
+                batch_anchor['attention_mask'],
+                batch_other['input_ids'],
+                batch_other['attention_mask']
+            )
+            # Calculate the contrastive loss of this batch and
+            # normalize by accumulation steps
+            loss = loss_function(anchor_embedding,
+                                 other_embedding,
+                                 labels) / accumulation_steps
         # Save the batch loss
         # unnormalized loss for reporting
         fold_losses.append(loss * accumulation_steps)
 
-        # Backpropogation pass
-        loss.backward()
+        # If cuda is available, use mixed precision training
+        if device == "cuda":
+            # Backpropogation pass
+            scaler.scale(loss).backward()
+            # Clear gradients explicitly
+            for param in model.parameters():
+                param.grad = None
+        else:
+            loss.backward()
 
         # Clear MPS cache after each epoch
         if device == 'mps':
@@ -199,10 +233,15 @@ def train_epoch(model,
             # Gradient Accumulation Implementation:
             # Adapted from
             # https://stackoverflow.com/a/78619879 [37]
-
-            # Update weights using calculated gradients from
-            # Adam optimizer
-            optimizer.step()
+            # If cuda is available, use mixed precision training
+            if device == "cuda":
+                # Replace optimizer.step() with:
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                # Update weights using calculated gradients from
+                # Adam optimizer
+                optimizer.step()
             # Clear out any existing gradients
             optimizer.zero_grad()
 
@@ -239,7 +278,8 @@ def train_epoch(model,
                               batch_idx,
                               True,
                               len(train_dataloader),
-                              num_val_batches)
+                              num_val_batches,
+                              device)
 
     # Adapted from:
     # https://machinelearningmastery.com/using-learning-rate-schedule-in-pytorch-training/  # noqa: E501
@@ -338,6 +378,10 @@ def train(view_path,
     if max_norm is not None:
         print(f"\n--- Clipping gradients to a max norm of {max_norm}.\n")
 
+    if device == "cuda":
+        # Setup gradient scaler for mixed precision training
+        scaler = GradScaler()
+
     # Reset any existing splits
     LILADataset.reset_splits()
 
@@ -365,10 +409,14 @@ def train(view_path,
     # Perform a full training cycle `num_folds` times, changing the
     # train/validation sets each time (K-folds cross-validation)
     for fold_idx in range(num_folds):
-        # Instantiate custom Siamese SBERT model and move to device
-        model = SiameseSBERT(MODEL).to(device)
+        # Clear GPU cache before starting new fold
+        if device == "cuda":
+            torch.cuda.empty_cache()
 
-        # Instantiate custom contrastive loss function
+        # Instantiate custom Siamese SBERT model and move to device
+        model = SiameseSBERT(MODEL, device).to(device)
+
+        # Instantiate custom contrastive loss fuction
         # TODO: Consider implementing 'modified contrastive loss' from
         # https://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf  # noqa: E501
         # [18] and Tyo Et. Al (2021) [15]
@@ -417,6 +465,8 @@ def train(view_path,
             batch_size=batch_size,
             shuffle=True,
             collate_fn=collate_fn,
+            pin_memory=PIN_MEMORY,
+            num_workers=NUM_WORKERS
         )
 
         # Instantiate the dataloader for the val_dataset
@@ -527,8 +577,15 @@ def train(view_path,
                                           batch_idx,
                                           False,
                                           len(train_dataloader),
-                                          len(val_dataloader))
+                                          len(val_dataloader),
+                                          device)
 
     logger.gen_summary_loss_plot(view_path, num_epochs,
                                  len(train_dataloader))
-    logger.gen_summary_eval_metrics(view_path, num_epochs)
+    # Log final memory stats if on cuda
+    if device == "cuda":
+        torch.cuda.synchronize()
+        print(f"\nFinal GPU Memory Stats for {view_path}:")
+        print(f"Allocated: {torch.cuda.memory_allocated()/1e9:.2f}GB")
+        print(f"Cached: {torch.cuda.memory_reserved()/1e9:.2f}GB\n")
+    logger.gen_summary_eval_metrics(view_path, num_epochs) 
