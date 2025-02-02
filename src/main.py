@@ -34,7 +34,8 @@ def train_per_distorted_view(args):
     batch_size = args.batch_size
     accumulation_steps = args.accumulation_steps
     chunk_size = args.chunk_size
-    margin = args.margin
+    margin_s = args.margin_s
+    margin_d = args.margin_d
     epsilon = args.epsilon
     num_pairs = args.num_pairs
     num_folds = args.num_folds
@@ -49,7 +50,8 @@ def train_per_distorted_view(args):
     assert type(batch_size) is int
     assert type(accumulation_steps) is int
     assert type(chunk_size) is int
-    assert type(margin) is float
+    assert type(margin_s) is float
+    assert type(margin_d) is float
     assert type(epsilon) is float
     assert type(num_pairs) is int
     assert type(num_folds) is int
@@ -71,9 +73,14 @@ def train_per_distorted_view(args):
                             f" {chunk_size}.\n Chunk sizes of less than 3"
                             " will not contain any actual data, due to"
                             " the special BERT [CLS] and [SEP] tokens.")
-    assert margin > 0, (f"ERROR: You chose a margin of {margin}.\nA"
-                        " margin of zero or less means different-author"
-                        " pairs will never contribute to learning.")
+    assert margin_s > 0, ("ERROR: You chose a same-author margin of"
+                          f" {margin_s}.\nA margin of zero or less means"
+                          " identical same-author pairs be 'pushed' apart,"
+                          " which will hurt learning.")
+    assert margin_d > 0, ("ERROR: You chose a different_author margin of"
+                          f" {margin_d}.\nA margin of zero or less means"
+                          " different-author pairs will never contribute"
+                          " to learning.")
     assert epsilon < 1e-5, (f"ERROR: You chosen an epsilon of {epsilon}."
                             "\n Consider choosing a smaller value.")
     assert num_pairs > 2, (f"ERROR: You chose {num_pairs} pairs.\n"
@@ -129,7 +136,8 @@ def train_per_distorted_view(args):
                 batch_size,
                 accumulation_steps,
                 chunk_size,
-                margin,
+                margin_s,
+                margin_d,
                 epsilon,
                 num_pairs,
                 num_folds,
@@ -199,14 +207,23 @@ if __name__ == '__main__':
                               ' generate, in tokens, from the'
                               ' LILADataset, including special BERT [CLS]'
                               ' and [SEP] tokens.'))
-    # Set the margin
-    parser.add_argument('margin',
+    # Set the same-author margin
+    parser.add_argument('margin_s',
                         type=float,
                         help=('<Required> [float] The margin to pass to'
                               ' the contrastive loss function, setting'
-                              ' the loss above which to stop \'pushing\''
-                              ' different author pairs appart.'))
-    # Set the margin
+                              ' the distance below which to stop'
+                              ' \'pulling\' different author pairs'
+                              ' together.'))
+    # Set the different-author margin
+    parser.add_argument('margin_d',
+                        type=float,
+                        help=('<Required> [float] The margin to pass to'
+                              ' the contrastive loss function, setting'
+                              ' the distance above which to stop'
+                              ' \'pushing\' different author pairs'
+                              ' apart.'))
+    # Set epsilon
     parser.add_argument('epsilon',
                         type=float,
                         help=('<Required> [float] A very small number to'
