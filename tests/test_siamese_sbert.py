@@ -23,7 +23,8 @@ if src_path not in sys.path:
 
 # Import custom modules
 from lila_dataset import LILADataset, collate_fn  # noqa: E402
-from siamese_sbert import SiameseSBERT, ContrastiveLoss  # noqa: E402
+from modified_contrastive_loss import ModifiedContrastiveLoss  # noqa: E402
+from siamese_sbert import SiameseSBERT  # noqa: E402
 from generate_test_data import generate_test_data, destroy_test_data  # noqa: E402
 
 
@@ -125,7 +126,8 @@ class TestSiameseSBERT:
         cls.num_pairs = 10_000
         cls.seed = 1
         cls.epsilon = 1e-6  # Same as Ibrahim et al. (2023) [7:10]
-        cls.margin = 1
+        cls.margin_s = 0.5
+        cls.margin_d = 0.5
 
         # Clear GPU cache before instantiating model
         # Clear cache initially
@@ -144,7 +146,8 @@ class TestSiameseSBERT:
         # https://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf [18]
         # and
         # Tyo Et. Al (2021) [15]
-        cls.loss_function = ContrastiveLoss(margin=cls.margin)
+        cls.loss_function = ModifiedContrastiveLoss(margin_s=cls.margin_s,
+                                                    margin_d=cls.margin_d)
 
         # Instantiate Adam optimizer
         cls.optimizer = torch.optim.Adam(cls.model.parameters(),
