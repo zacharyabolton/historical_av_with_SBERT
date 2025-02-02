@@ -1,0 +1,91 @@
+.
+├── LICENSE
+├── README.md
+├── baseline
+│   ├── baseline_evaluating.ipynb
+│   ├── baseline_training.ipynb
+│   ├── cli-out
+│   │   ├── evals
+│   │   └── trainings
+│   ├── cngdist.py
+│   ├── data
+│   │   ├── train
+│   │   └── validate
+│   ├── models
+│   │   └── baseline
+│   ├── out
+│   │   ├── DV-MA-k-20000
+│   │   ├── DV-MA-k-300
+│   │   ├── DV-MA-k-3000
+│   │   └── undistorted
+│   ├── pan22_verif_evaluator.py
+│   ├── tabler.py
+│   ├── training_metrics.csv
+│   ├── training_metrics.md
+│   └── validation_metrics.csv
+├── data
+│   ├── Dataset_Card.md
+│   ├── normalized
+│   │   ├── DV-MA-k-20000
+│   │   │   ├── A
+│   │   │   ├── U
+│   │   │   ├── excluded
+│   │   │   └── notA
+│   │   ├── DV-MA-k-300
+│   │   │   ├── A
+│   │   │   ├── U
+│   │   │   ├── excluded
+│   │   │   └── notA
+│   │   ├── DV-MA-k-3000
+│   │   │   ├── A
+│   │   │   ├── U
+│   │   │   ├── excluded
+│   │   │   └── notA
+│   │   ├── metadata.csv
+│   │   └── undistorted
+│   │       ├── A
+│   │       ├── U
+│   │       ├── excluded
+│   │       └── notA
+│   └── test
+├── directory_structure.txt
+├── model_out
+│   ├── model_saving_exp
+│   │   ├── hyperparameters.json
+│   │   └── undistorted
+│   └── model_saving_exp_2
+│       ├── hyperparameters.json
+│       └── undistorted
+├── notebooks
+│   ├── Normalize TVOTS Data.ipynb
+│   ├── freq_dist.ipynb
+│   ├── infer.ipynb
+│   ├── losses_loader_visualizer.ipynb
+│   ├── run_visualizer.ipynb
+│   └── word_counter.ipynb
+├── requirements.txt
+├── saved_experiments
+├── scripts
+│   ├── TVOTS_loader.py
+│   ├── text_distorter.py
+│   ├── text_normalizer.py
+│   └── the_valley_of_the_shadow_downloader.py
+├── src
+│   ├── constants.py
+│   ├── grid_search.sh
+│   ├── lila_dataset.py
+│   ├── logger.py
+│   ├── main.py
+│   ├── modified_contrastive_loss.py
+│   ├── siamese_sbert.py
+│   └── train.py
+├── tests
+│   ├── generate_test_data.py
+│   ├── pytest.ini
+│   ├── test_lila_dataset.py
+│   ├── test_logger.py
+│   ├── test_siamese_sbert.py
+│   ├── test_text_distorter.py
+│   ├── test_text_normalizer.py
+│   └── test_train.py
+└── venv
