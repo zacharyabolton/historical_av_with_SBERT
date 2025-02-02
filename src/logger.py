@@ -3,7 +3,6 @@ A logger class for logging results of `train.py`.
 """
 import os
 import sys
-from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.ticker as ticker
@@ -12,6 +11,7 @@ from sklearn import metrics
 from constants import ROOT_DIR, P1, P2
 import pandas as pd
 import time
+import torch
 
 # Add src directory to sys.path
 # Adapted from Taras Alenin's answer on StackOverflow at:
@@ -221,6 +221,9 @@ class Logger():
         plt.legend()
 
         plt.yscale('log')
+        # Given contastive-loss with cosine-similarity the expected range
+        # of losses is 0 - 1
+
         plt.grid(True, which="both", ls="-", alpha=0.2)
 
         # Show the plot
@@ -494,9 +497,6 @@ class Logger():
         # raw_losses_loaded = np.load(raw_losses_path)
 
         fig, ax = plt.subplots(figsize=(10, 6))
-        # Given contastive-loss with cosine-similarity the expected range
-        # of losses is 0 - 1
-        ax.set_ylim(0.0001, 1.0)
 
         colors = ['b', 'g', 'r', 'c', 'm', 'y']
         line_types = ['-', '--', '-.', ':']
@@ -552,6 +552,9 @@ class Logger():
         plt.suptitle(f"Experiment: {self.experiment_name}")
         plt.legend()
         plt.yscale('log')
+        # Given contastive-loss with cosine-similarity the expected range
+        # of losses is 0 - 1
+        ax.set_ylim(1e-5, 1.0)
         plt.grid(True, which="both", ls="-", alpha=0.2)
         plt.tight_layout()
         plt.savefig(fold_png_path)
@@ -618,10 +621,6 @@ class Logger():
         :type line_width: float
         """
         line_style = f"{color}{line_type}"
-
-        # Given contastive-loss with cosine-similarity the expected range
-        # of losses is 0 - 1
-        ax.set_ylim(0.0001, 1.0)
 
         ax.plot(x, y, line_style, alpha=0.3,
                 label=label, linewidth=line_width)
@@ -904,3 +903,57 @@ class Logger():
         self.folds_true_scores.to_csv(true_scores_filepath, index=False)
 
         self.reset_val_scores()
+
+    def save_model(self,
+                   model,
+                   optimizer,
+                   fold_idx,
+                   epoch_idx,
+                   losses,
+                   metrics,
+                   view_path):
+        """
+        Save model and training state.
+
+        :param model: The model to save.
+        :type model: torch.nn.Module
+
+        :param optimizer: The optimizer used for the model to save.
+        :type optimizer: torch.nn.Module
+
+        :param fold_idx: The fold at which the model is saved.
+        :type fold_idx: int
+
+        :param epoch_idx: The epoch at which the model is saved.
+        :type epoch_idx: int
+
+        :param losses: The losses accrued thus far.
+        :type losses: list
+
+        :param metrics: The evaluation metrics accrued thus far.
+        :type metrics: dict
+
+        :param view_path: The path to the view being trained on.
+        :type view_path: str
+        """
+        # Get view based directory
+        # Adapted from:
+        # https://stackoverflow.com/a/3925147
+        # GENERATE HEDGED SCORES SUMMARY
+        view_out_dir = os.path.basename(os.path.normpath(view_path))
+        view_out_path = os.path.join(self.run_out_path, view_out_dir)
+
+        # Create saved model name
+        model_name = f"{self.experiment_name}_fold_{fold_idx}_epoch_{epoch_idx}.pt"
+        model_path = os.path.join(view_out_path, model_name)
+
+        model = {
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'fold': fold_idx,
+            'epoch': epoch_idx,
+            'losses': losses,
+            'metrics': metrics,
+        }
+
+        torch.save(model, model_path)
