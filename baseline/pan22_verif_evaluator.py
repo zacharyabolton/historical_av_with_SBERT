@@ -219,7 +219,11 @@ def f_05_u_score(true_y, pred_y, pos_label=1, threshold=0.5):
         elif true_y[i] == pos_label and pred != true_y[i]:
             n_fn += 1
 
-    return (1.25 * n_tp) / (1.25 * n_tp + 0.25 * (n_fn + n_u) + n_fp)
+    # Edited by Zac Bolton to catch zero division errors
+    denominator = (1.25 * n_tp + 0.25 * (n_fn + n_u) + n_fp)
+    if denominator == 0:
+        return 0.0  # Return 0 when we have no valid predictions
+    return (1.25 * n_tp) / denominator
 
 def brier_score(true_y, pred_y):
     """
