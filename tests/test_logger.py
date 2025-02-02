@@ -108,7 +108,8 @@ class TestLogger:
         cls.batch_size = 4
         cls.accumulation_steps = 1
         cls.chunk_size = 4
-        cls.margin = 0.5
+        cls.margin_s = 0.5
+        cls.margin_d = 0.5
         cls.epsilon = 0.000001
         cls.num_pairs = 32
         cls.num_folds = 2
@@ -125,7 +126,8 @@ class TestLogger:
             'batch_size': cls.batch_size,
             'accumulation_steps': cls.accumulation_steps,
             'chunk_size': cls.chunk_size,
-            'margin': cls.margin,
+            'margin_s': cls.margin_s,
+            'margin_d': cls.margin_d,
             'epsilon': cls.epsilon,
             'num_pairs': cls.num_pairs,
             'num_folds': cls.num_folds,
