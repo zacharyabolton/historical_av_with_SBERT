@@ -41,14 +41,12 @@ fastjsonschema==2.21.0
 filelock==3.16.1
 flake8==7.1.1
 fonttools==4.55.3
--e git+https://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@github.com/zacharyabolton/historical_av_with_SBERT@ec85bb8876f569c84351a0c5fceef33373f5d259#egg=foo
 fqdn==1.5.1
 frozenlist==1.5.0
 fsspec==2024.9.0
 gitdb==4.0.11
 GitPython==3.1.43
 h11==0.14.0
--e git+https://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@github.com/zacharyabolton/historical_av_with_SBERT@ec85bb8876f569c84351a0c5fceef33373f5d259#egg=historical_av_with_SBERT
 httpcore==1.0.7
 httpx==0.28.0
 huggingface-hub==0.26.3
