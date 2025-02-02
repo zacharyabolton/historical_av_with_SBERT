@@ -10,7 +10,8 @@ import torch.nn.functional as F
 import random
 import numpy as np
 from lila_dataset import LILADataset, collate_fn
-from siamese_sbert import SiameseSBERT, ContrastiveLoss
+from siamese_sbert import SiameseSBERT
+from modified_contrastive_loss import ModifiedContrastiveLoss
 from torch.cuda.amp import GradScaler, autocast
 
 # Parallelization/Concurency
@@ -294,7 +295,8 @@ def train(view_path,
           batch_size,
           accumulation_steps,
           chunk_size,
-          margin,
+          margin_s,
+          margin_d,
           epsilon,
           num_pairs,
           num_folds,
@@ -330,10 +332,15 @@ def train(view_path,
     tokens.
     :type chunk_size: int
 
-    :param margin: <Required> The margin for the contrastive loss
-    function. This is the loss value above which to no longer 'push'
-    different-author embeddings appart.
-    :type margin: float
+    :param margin_s: <Required> The same-author margin for the contrastive
+    loss function. This is the loss value below which to no longer 'pull'
+    same-author embeddings together.
+    :type margin_s: float
+
+    :param margin_d: <Required> The different-author margin for the
+    contrastive loss function. This is the loss value above which to no
+    longer 'push' different-author embeddings appart.
+    :type margin_d: float
 
     :param epsilon: <Required> This is a very small number to pass to the
     optimizer for numerical stability.
@@ -417,10 +424,9 @@ def train(view_path,
         model = SiameseSBERT(MODEL, device).to(device)
 
         # Instantiate custom contrastive loss fuction
-        # TODO: Consider implementing 'modified contrastive loss' from
-        # https://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf  # noqa: E501
-        # [18] and Tyo Et. Al (2021) [15]
-        loss_function = ContrastiveLoss(margin=margin)
+        # 'modified contrastive loss'
+        loss_function = ModifiedContrastiveLoss(margin_s=margin_s,
+                                                margin_d=margin_d)
 
         # Instantiate Adam optimizer
         optimizer = torch.optim.Adam(model.parameters(),
@@ -565,6 +571,15 @@ def train(view_path,
                                                epoch_idx,
                                                num_epochs)
 
+                        metrics = {
+                            'similarities': val_similarities,
+                            'truths': val_truths,
+                            'hedged_scores': logger.folds_hedged_scores
+                                                   .iloc[-1].to_dict(),
+                            'true_scores': logger.folds_true_scores
+                                                 .iloc[-1].to_dict()
+                        }
+
                         logger.echo_stats(batch_size,
                                           num_folds,
                                           num_epochs,
@@ -582,6 +597,25 @@ def train(view_path,
 
     logger.gen_summary_loss_plot(view_path, num_epochs,
                                  len(train_dataloader))
+
+    # Save model and all metrics for resumption/inference
+    final_metrics = {
+        'hedged_scores': logger.folds_hedged_scores[
+            logger.folds_hedged_scores['fold'] == fold_idx
+        ].to_dict('records'),
+        'true_scores': logger.folds_true_scores[
+            logger.folds_true_scores['fold'] == fold_idx
+        ].to_dict('records')
+    }
+
+    logger.save_model(model,
+                      optimizer,
+                      fold_idx,
+                      num_epochs-1,
+                      fold_losses,
+                      final_metrics,
+                      view_path)
+
     # Log final memory stats if on cuda
     if device == "cuda":
         torch.cuda.synchronize()
