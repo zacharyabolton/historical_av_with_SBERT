@@ -39,7 +39,7 @@ The model architecture at inference time is as follows:
 import torch
 import torch.nn as nn
 from transformers import AutoModel
-import torch.nn.functional as F
+# import torch.nn.functional as F
 
 
 class SiameseSBERT(nn.Module):
@@ -163,73 +163,3 @@ class SiameseSBERT(nn.Module):
         mean_embeddings = sum_embeddings / sum_mask
 
         return mean_embeddings
-
-
-class ContrastiveLoss(nn.Module):
-    """
-    Contrastive Loss function
-
-    Inherits from `nn.Module`, the base class for all neural networks from
-    PyTorch.
-
-    Adapted from Hadsell, Chopra, and LeCun (2006) [29]:
-    [29] R. Hadsell, S. Chopra, and Y. LeCun. 2006. Dimensionality
-    Reduction by Learning an Invariant Mapping. In 2006 IEEE Computer
-    Society Conference on Computer Vision and Pattern Recognition
-    (CVPR’06), 1735–1742. DOI:https://doi.org/10.1109/CVPR.2006.100
-
-
-    And Shairoz. (2021) [31]:
-    [31] ShairozS. 2021. losses.py. Gist 1a5e6953f0533cf19240ae1473eaedde.
-    Retrieved November 4, 2024 from
-    https://gist.github.com/ShairozS/1a5e6953f0533cf19240ae1473eaedde
-    """
-
-    def __init__(self, margin=1.0):
-        """
-        Initializes the Contrastive Loss model
-
-        :param margin: The distance under which to push dissimilar pairs
-        (label = 0) apart. Dissimilar pairs at a distance greater than the
-        margin will have a loss of zero.
-        :type margin: float
-        """
-
-        super(ContrastiveLoss, self).__init__()
-        self.margin = margin
-
-    def forward(self, anchor, other, labels):
-        """
-        The forward step for contrastive loss. Calculates the contrastive
-        loss between `anchor` and `other` given their labels `labels`.
-
-        :param anchor, other: Final batched embeddings for input sentences
-        A (achor) & B (other).
-        :type anchor, other: torch.Tensor
-        :param labels: Label indicating whether the sentences have
-            different authors (0) or the same author (1).
-        :type labels: int (0 or 1)
-        """
-
-        # Adapted from:
-        # https://github.com/UKPLab/sentence-transformers/blob/master/sentence_transformers/losses/ContrastiveLoss.py  # noqa E501
-
-        # Calculate cosine similarity as per Ibrahim et al. (2023) [7:9]
-        distances = (F.cosine_similarity(anchor, other) + 1) / 2
-
-        # Loss: Similar pairs should have low distance;
-        # dissimilar should have high
-        # When label = 1 (same author), the loss is simply the first term,
-        # `same_author_loss`, which is the squared distance, rewarding
-        # closeness with lower # loss values.
-        # When label = 0 (different author), the loss is the second term,
-        # `diff_author_loss`, and grows quadratically the closer the pairs
-        # are, starting at `margin` where the loss is zero.
-        same_author_loss = labels.float() * distances.pow(2)
-        diff_author_loss = (1 - labels).float() *\
-            F.relu(self.margin - distances).pow(2)
-        # Multiply by 0.5 to balance contribution of pos and neg pairs
-        # and improve gradient stability
-        losses = 0.5 * (same_author_loss + diff_author_loss)
-        # Return the mean of all the losses
-        return losses.mean()
