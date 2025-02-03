@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Hyperparameters to vary
-margin_ss=(0.4 0.5 0.6 0.7)
-margin_ds=(0.3 0.4 0.5 0.6)
+margin_ss=(0.5 0.6 0.7 0.8 0.9)
+margin_ds=(0.1 0.2 0.3 0.4 0.5)
 
 # Fixed hyperparameters (based on prior experiments)
 batch_size=8
@@ -13,7 +13,6 @@ num_pairs=4096
 num_folds=2
 num_epochs=1
 initial_lr=0.00002
-seed=0
 max_norm=1.0
 
 for margin_s in "${margin_ss[@]}"; do
@@ -37,7 +36,6 @@ for margin_s in "${margin_ss[@]}"; do
             $num_folds \
             $num_epochs \
             $initial_lr \
-            -s $seed \
             -m $max_norm
             
         echo "%%%%%%%%%%%% ending ${exp_name}"
