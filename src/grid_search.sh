@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Hyperparameters to vary
-margin_ss=(0.2 0.25 0.3 0.35 0.4)
-margin_ds=(0.4 0.45 0.5 0.55 0.6)
+margin_ss=(0.4 0.5 0.6 0.7)
+margin_ds=(0.3 0.4 0.5 0.6)
 
 # Fixed hyperparameters (based on prior experiments)
 batch_size=8
