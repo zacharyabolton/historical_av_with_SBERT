@@ -173,7 +173,7 @@ def train_epoch(model,
         batch_other = {k: v.to(device)
                        for k, v in batch_other.items()}
         labels = labels.to(device)
-        
+
         # If cuda is available, use mixed precision training
         if device == "cuda":
             with autocast():
