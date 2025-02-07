@@ -125,10 +125,10 @@ def train_per_distorted_view(args):
             views.append(view_path)
 
     # SAVE RESULTS!
-    logger = Logger(dataset_path, '../model_out', args.__dict__)
+    logger = Logger(dataset_path, '/mnt/data/model_out', args.__dict__)
 
     try:
-        for view_path in sorted([undistorted_path]):
+        for view_path in sorted(views):
             # Run training
             train(
                 view_path,
