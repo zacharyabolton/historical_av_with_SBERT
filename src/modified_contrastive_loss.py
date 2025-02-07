@@ -46,14 +46,14 @@ class ModifiedContrastiveLoss(nn.Module):
         """
         Initializes the Contrastive Loss model
 
-        :param margin_s: The distance over which to pull similar pairs
-        (label = 1) together. Similar pairs at a distance lower than the
-        margin will have a loss of zero.
+        :param margin_s: The similarity threshold over which to pull
+        same-author pairs (label = 1) together. Same-author pairs at a
+        similarity lower than the margin will have a loss of zero.
         :type margin: float
 
-        :param margin_d: The distance under which to push dissimilar pairs
-        (label = 0) apart. Dissimilar pairs at a distance greater than the
-        margin will have a loss of zero.
+        :param margin_d: The similarity threshold under which to push
+        different-author pairs (label = 0) apart. Different-author pairs
+        at a similarity greater than the margin will have a loss of zero.
         :type margin_d: float
         """
 
@@ -80,8 +80,8 @@ class ModifiedContrastiveLoss(nn.Module):
         # Calculate cosine similarity as per Ibrahim et al. (2023) [8:9]
         similarities = (F.cosine_similarity(anchor, other) + 1) / 2
 
-        # Modified loss with two margins: Similar pairs should have low
-        # distance; dissimilar should have high.
+        # Modified loss with two margins: Same-author pairs should have
+        # low similarity; different-author pairs should have high.
         # When label = 1 (same author), the loss is the first term of
         # `losses`, `same_author_loss`, and grows quadratically the
         # further the pairs are, starting at `similarity == margin_s`
