@@ -30,16 +30,12 @@ class Logger():
     of training runs to disk.
     """
 
-    def __init__(self, dataset_path, base_out_path, hyperparameters):
+    def __init__(self, base_out_path, hyperparameters):
         """
         The constructor for the logger, responsible for setting up
         members which the `log_train_results` and `log_eval_results`
         method will use, and writing initial directories and destination
         files to disk.
-
-        :param dataset_path: <Required> Path to the source dataset which
-        the calling routine will be training on.
-        :type dataset_path: str
 
         :param base_out_path: <Required> Path to the root output
         directory, wherin Logger will create a sub-directory for storing
@@ -50,13 +46,9 @@ class Logger():
         this run.
         :type hyperparameters: dict
         """
-        self.dataset_path = dataset_path
         self.num_views = 0
-        # Get the number of views to be processed for time calcs
-        for view_dir in os.listdir(self.dataset_path):
-            view_path = os.path.join(dataset_path, view_dir)
-            if os.path.isdir(view_path) and view_dir[0] != '.':
-                self.num_views += 1
+        # Hardcode the num views for time calcs on VALLA validation
+        self.num_views = 4
         # Get instantiation time for time calcs
         self.start_time = time.time()
         self.base_out_path = base_out_path
@@ -102,8 +94,6 @@ class Logger():
 
         self.hyperparameters["run_out_path"] = os.path.abspath(
             self.run_out_path)
-        self.hyperparameters["dataset_path"] = os.path.abspath(
-            self.dataset_path)
 
         # Save run hyperparameters
         params_file_path = os.path.join(self.run_out_path,
@@ -192,21 +182,19 @@ class Logger():
                     "_train_losses.png")
         fold_png_path = os.path.join(view_out_path, fold_png)
 
-        plain_losses = [tensor.item() for tensor in fold_losses]
-
         if len(self.folds_losses) == fold_idx + 1:
             # Same fold as prior, overwrite plot
-            self.folds_losses[-1] = plain_losses
+            self.folds_losses[-1] = fold_losses
         else:
             # New fold, start new plot
-            self.folds_losses.append(plain_losses)
+            self.folds_losses.append(fold_losses)
 
         # Create the plot
         fig, ax = plt.subplots(figsize=(10, 6))
-        batch_numbers = np.arange(len(plain_losses))
+        batch_numbers = np.arange(len(fold_losses))
         self.plot_loss(ax,
                        batch_numbers,
-                       plain_losses,
+                       fold_losses,
                        'Training Loss',
                        epoch_idx + 1,
                        num_batches_per_epoch,
