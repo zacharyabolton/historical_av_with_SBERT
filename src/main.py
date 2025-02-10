@@ -30,7 +30,6 @@ def train_per_distorted_view(args):
     :type args: argparse.Namespace
     """
     experiment_name = args.experiment_name
-    dataset_path = args.dataset_path
     batch_size = args.batch_size
     accumulation_steps = args.accumulation_steps
     chunk_size = args.chunk_size
@@ -46,7 +45,6 @@ def train_per_distorted_view(args):
 
     # Verify types
     assert type(experiment_name) is str
-    assert type(dataset_path) is str
     assert type(batch_size) is int
     assert type(accumulation_steps) is int
     assert type(chunk_size) is int
@@ -65,7 +63,6 @@ def train_per_distorted_view(args):
         assert i in 'abcdefghijklmnopqrstuvwxyz0123456789_', \
             ('Experiment names must consist only of lowercase letters,'
              ' numbers and underscores.')
-    assert os.path.exists(dataset_path)
     assert batch_size >= 1, ("ERROR: You chose a batch size of"
                              f" {batch_size}.\n Batch sizes less than 1"
                              " are not possible.")
@@ -99,40 +96,24 @@ def train_per_distorted_view(args):
                               " will result in no convergence. Please"
                               " a value greater than zero.")
 
-    undistorted_path = os.path.join(dataset_path, 'undistorted')
-    assert os.path.exists(undistorted_path), \
-        (f"The provided path {dataset_path} containes no subdirectory"
-         " named 'undistorted'. Please provide a path to a properly"
-         " formatted dataset directory. See help: `python train.py -h`.")
-    metadata_path = os.path.join(dataset_path, 'metadata.csv')
-    assert os.path.exists(metadata_path), \
-        (f"The provided metadata {metadata_path} does not exist. Please"
-         " ensure the root data view directory contains a 'metadata.csv'"
-         " file. See help: `python train.py -h`.")
-    # Create list to store all views to process
-    views = [undistorted_path]
-    for view_dir in os.listdir(dataset_path):
-        view_path = os.path.join(dataset_path, view_dir)
-        if view_dir != 'undistorted' and\
-           os.path.isdir(view_path) and\
-           view_dir[0] != '.':
-            assert view_dir[:8] == 'DV-SA-k-'\
-                or view_dir[:8] == 'DV-MA-k-', ("Your view directories"
-                                                " are not in the form"
-                                                " DV-<<S|M>>A-k-<<k>>."
-                                                " See help: `python"
-                                                " train.py -h`.")
-            views.append(view_path)
+    # Hardcode views for VALLA validation
+    views = [
+        ('../../pan20-authorship-verification-training-small/'
+         'processed/small/pan20_train_'
+         'undistorted.csv')
+    ]
+
+    for view in views:
+        assert os.path.exists(view), f'{view} does not exist!'
 
     # SAVE RESULTS!
-    logger = Logger(dataset_path, '/mnt/data/model_out', args.__dict__)
+    logger = Logger('/mnt/data/model_out', args.__dict__)
 
     try:
         for view_path in sorted(views):
             # Run training
             train(
                 view_path,
-                metadata_path,
                 batch_size,
                 accumulation_steps,
                 chunk_size,
@@ -165,27 +146,6 @@ if __name__ == '__main__':
                               " identification of experiment outputs."
                               " Must consist only of lowercase letters,"
                               " numbers, and underscores."))
-
-    # Set the path to the dataset. Expects structure such as:
-    # .
-    # ├── undistorted
-    # │   ├── A
-    # │   ├── notA
-    # │   └── U
-    # ├── DV-MA-k-<<k>>
-    # ├── DV-SA-k-<<k>>
-    # ├── DV- etc...
-    # └── metadata.csv
-    parser.add_argument('dataset_path',
-                        type=str,
-                        help=("Set the path to the dataset. Expects a"
-                              " path to a directory whith at least one"
-                              " subdirectory named 'undistorted'"
-                              " containing 'A', 'notA', and 'U'"
-                              " sub-subirectories. Any further"
-                              " subdirectories must start 'DV-MA-' or"
-                              " 'DV-SA-' and and end 'k-<<k>>` where"
-                              " <<k>> is an integer greater than one."))
 
     # Set the batch size
     parser.add_argument('batch_size',
