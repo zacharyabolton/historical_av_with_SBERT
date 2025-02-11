@@ -25,7 +25,7 @@ cd historical_av_with_SBERT
 Create a virtual environment using Python 3.9:
 
 ```bash
-python3.9 -m venv venv
+python3 -m venv venv
 ```
 
 Activate the virtual environment:
