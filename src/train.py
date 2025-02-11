@@ -220,6 +220,8 @@ def train_epoch(model,
                                  labels) / accumulation_steps
         # Save the batch loss
         # unnormalized loss for reporting
+        # Adapted from:
+        # https://stackoverflow.com/a/64614932
         fold_losses.append((loss * accumulation_steps).detach().cpu().item())
 
         # If cuda is available, use mixed precision training
@@ -413,6 +415,8 @@ def train(view_path,
         if device == "cuda":
             torch.cuda.empty_cache()
         # Collect garbage at the end of each fold
+        # Adapted from:
+        # https://stackoverflow.com/a/62556666
         gc.collect()
 
 
