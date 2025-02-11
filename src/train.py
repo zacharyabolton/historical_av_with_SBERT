@@ -143,7 +143,6 @@ def train_epoch(model,
     applied.
     :type max_norm: float
     """
-    torch.optim
     # Gradient Accumulation Implementation:
     # Adapted from
     # https://stackoverflow.com/a/78619879 [37]
