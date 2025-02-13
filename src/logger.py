@@ -142,7 +142,6 @@ class Logger():
                                                        'overall',
                                                        'sub_overall'])
 
-
     def log_train_results(self,
                           view_path,
                           fold_losses,
