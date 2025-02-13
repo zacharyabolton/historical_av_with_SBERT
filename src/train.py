@@ -23,8 +23,8 @@ valla_path = os.path.join('..', 'VALLA')
 if valla_path not in sys.path:
     sys.path.insert(0, valla_path)
 
-from valla_collate_fn import valla_collate_fn
-from av_dataset import VALLAAVTrainDataset, VALLAAVValDataset
+from valla_collate_fn import valla_collate_fn  # noqa: E402
+from av_dataset import VALLAAVTrainDataset, VALLAAVValDataset  # noqa: E402
 
 # Parallelization/Concurency
 # Use CUDA if available, else use MPS if available. Fallback is CPU
@@ -418,7 +418,6 @@ def train(view_path,
         # Adapted from:
         # https://stackoverflow.com/a/62556666
         gc.collect()
-
 
         # Instantiate custom Siamese SBERT model and move to device
         model = SiameseSBERT(MODEL, device).to(device)
