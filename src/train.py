@@ -574,15 +574,6 @@ def train(view_path,
                                                epoch_idx,
                                                num_epochs)
 
-                        metrics = {
-                            'similarities': val_similarities,
-                            'truths': val_truths,
-                            'hedged_scores': logger.folds_hedged_scores
-                                                   .iloc[-1].to_dict(),
-                            'true_scores': logger.folds_true_scores
-                                                 .iloc[-1].to_dict()
-                        }
-
                         logger.echo_stats(batch_size,
                                           num_folds,
                                           num_epochs,
@@ -625,10 +616,4 @@ def train(view_path,
                       final_metrics,
                       view_path)
 
-    # Log final memory stats if on cuda
-    if device == "cuda":
-        torch.cuda.synchronize()
-        print(f"\nFinal GPU Memory Stats for {view_path}:")
-        print(f"Allocated: {torch.cuda.memory_allocated()/1e9:.2f}GB")
-        print(f"Cached: {torch.cuda.memory_reserved()/1e9:.2f}GB\n")
-    logger.gen_summary_eval_metrics(view_path, num_epochs) 
+    logger.gen_summary_eval_metrics(view_path, num_epochs)
