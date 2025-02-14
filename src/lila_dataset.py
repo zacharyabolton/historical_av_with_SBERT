@@ -15,6 +15,7 @@ import pandas as pd
 import math
 import copy
 from sklearn.model_selection import KFold
+import warnings
 # import torch.nn.functional as F  # Only if preserving ending chunks
 
 
@@ -58,7 +59,8 @@ class LILADataset(Dataset):
                  num_folds=5,
                  fold_idx=None,
                  training=True,
-                 seed=None):
+                 seed=None,
+                 letters=False):
         """
         Constructor for setting up data members needed for the
         LILADataset.
@@ -105,12 +107,21 @@ class LILADataset(Dataset):
         module as a seed, for reproducibility. Defaults to `None` which
         causes the `random` module to use the system clock as a seed.
         :type seed: int
+
+        :param letters: <Optional> Boolean flag indicating if letter
+        inference will executed. Defaults to `False`.
+        :type letters: bool
         """
 
         assert (cnk_size > 2), ("Your chunk size is too small."
                                 " Please increase.")
-        assert (num_pairs % 2) == 0, ("Please use an even number of"
-                                      " pairs for data balancing.")
+        if letters:
+            warnings.warn("Running letters inference, so parameters"
+                          " `num_pairs` and `num_folds` will not be"
+                          " applied")
+        else:
+            assert (num_pairs % 2) == 0, ("Please use an even number of"
+                                          " pairs for data balancing.")
 
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL)
 
@@ -155,43 +166,53 @@ class LILADataset(Dataset):
             self._metadata = self._metadata[omitted_mask]
             self._metadata.reset_index(inplace=True)
 
+            # Process A chunks
             self._A_dir = os.path.join(self._data_dir, "A")
-            self._U_dir = os.path.join(self._data_dir, "U")
-            self._notA_dir = os.path.join(self._data_dir, "notA")
-
             self._A_docs = self._get_docs(self._A_dir)
-            self._U_docs = self._get_docs(self._U_dir)
-            self._notA_docs = self._get_docs(self._notA_dir)
-
             self._A_docs_tokenized = self._tokenize(self._A_docs)
-            self._U_docs_tokenized = self._tokenize(self._U_docs)
-            self._notA_docs_tokenized = self._tokenize(self._notA_docs)
-
             self._A_docs_cnked = self._cnk_tokens(self._A_docs_tokenized)
-            self._U_docs_cnked = self._cnk_tokens(self._U_docs_tokenized)
-            self._notA_docs_cnked = self._cnk_tokens(
-                self._notA_docs_tokenized)
 
-            # Create all pairs first without train/val splitting
-            LILADataset._base_pairs = self._create_pairs(
-                self._A_docs_cnked, self._notA_docs_cnked)
+            if letters:
+                # Process U chunks
+                self._U_dir = os.path.join(self._data_dir, "U")
+                self._U_docs = self._get_docs(self._U_dir)
+                self._U_docs_tokenized = self._tokenize(self._U_docs)
+                self._U_docs_cnked = self._cnk_tokens(
+                    self._U_docs_tokenized)
 
-            # Save the input number of splits on the class level
-            LILADataset._num_folds = num_folds
+                # Create all U pairs
+                LILADataset._base_pairs = self._create_U_pairs(
+                    self._U_docs_cnked, self._A_docs_cnked)
+            else:
+                # Process notA chunks
+                self._notA_dir = os.path.join(self._data_dir, "notA")
+                self._notA_docs = self._get_docs(self._notA_dir)
+                self._notA_docs_tokenized = self._tokenize(
+                    self._notA_docs)
+                self._notA_docs_cnked = self._cnk_tokens(
+                    self._notA_docs_tokenized)
 
-            # Initialize KFold
-            kf = KFold(n_splits=LILADataset._num_folds, shuffle=True,
-                       random_state=seed)
+                # Create all pairs first without train/val splitting
+                LILADataset._base_pairs = self._create_pairs(
+                    self._A_docs_cnked, self._notA_docs_cnked)
 
-            # Convert pairs to indices
-            indices = list(range(len(LILADataset._base_pairs)))
+                # Save the input number of splits on the class level
+                LILADataset._num_folds = num_folds
 
-            # Store fold splits. A list of tuples of lists, where outer
-            # the list's tuple elements are splits for each fold, and the
-            # inner tuples' elements are lists of indices into the full
-            # dataset locating training samples (tuple element 0) or
-            # validation samples (tuple element 1)
-            LILADataset._fold_splits = list(kf.split(indices))
+                # Initialize KFold
+                kf = KFold(n_splits=LILADataset._num_folds, shuffle=True,
+                           random_state=seed)
+
+                # Convert pairs to indices
+                indices = list(range(len(LILADataset._base_pairs)))
+
+                # Store fold splits. A list of tuples of lists, where
+                # outer the list's tuple elements are splits for each
+                # fold, and the inner tuples' elements are lists of
+                # indices into the full dataset locating training samples
+                # (tuple element 0) or validation samples (tuple
+                # element 1)
+                LILADataset._fold_splits = list(kf.split(indices))
 
         # Use the stored splits and pairs
         # If fold_idx is provided, use only that fold's data
@@ -619,3 +640,62 @@ class LILADataset(Dataset):
         )
 
         return train_dataset, val_dataset
+
+    def _create_U_pairs(self, U_docs_cnked, A_docs_cnked):
+        """
+        Create inference pairs.
+        Pair every U chunk with 10 randomly chosen A chunks.
+
+        :param U_docs_cnked: <Required> A list of tuples, where the
+        first tuple element is the associated index for a given `U`
+        (Unknown Author) file in the `self._metadata` member, and the
+        second element is a list of PyTorch embeddings of the chunks
+        generated from that file.
+        :type U_docs_cnked: list
+
+        :param A_docs_cnked: <Required> A list of tuples, where the first
+        tuple element is the associated index for a given `A` (LaSalle)
+        file in the `self._metadata` member, and the second element is a
+        list of PyTorch embeddings of the chunks generated from that file.
+        :type A_docs_cnked: list
+
+        :returns: A list of tuples, where the first and second elements
+        are PyTorch embeddings of chunks `U` and `A` docs, respectively.
+        :rtype: list
+        """
+        # Define the number of random A chunks to pair with every U chunk
+        # encountered
+        num_A_per_U = 10
+        # Create lists to store raw chunks for pairing
+        U_cnks = []
+        A_cnks = []
+        # Fill dict with appropriate chunks
+        for (doc_idx, cnks) in U_docs_cnked:
+            U_cnks.extend(cnks)
+        # Fill dict with appropriate chunks
+        for (doc_idx, cnks) in A_docs_cnked:
+            A_cnks.extend(cnks)
+
+        assert len(A_cnks) >= num_A_per_U, ("Not enough A chunks"
+                                            f" ({len(A_cnks)}) to create"
+                                            f" {num_A_per_U} pairs per U"
+                                            " chunk")
+
+        # Create list to store inference pairs
+        inference_pairs = []
+
+        # Get each U chunk
+        for i in range(len(U_cnks)):
+
+            # For every U chunk pair it with `num_A_per_U` randomly
+            # selected A chunks
+            other_cnks = random.Random(self._seed).sample(A_cnks,
+                                                          num_A_per_U)
+
+            # Pair up
+            for j in range(len(other_cnks)):
+                # Add to list as (Anchor, Other) tuple
+                # where 'Anchor' is a U chunk and 'Other' is an A chunk
+                inference_pairs.append((U_cnks[i], other_cnks[j]))
+
+        return inference_pairs
