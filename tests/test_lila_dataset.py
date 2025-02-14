@@ -11,6 +11,8 @@ import sys
 import torch
 import numpy as np
 from constants import ROOT_DIR
+import pytest
+import warnings
 
 # Add src directory to sys.path
 # Adapted from Taras Alenin's answer on StackOverflow at:
@@ -24,7 +26,7 @@ from lila_dataset import LILADataset  # noqa: E402
 from generate_test_data import generate_test_data, destroy_test_data  # noqa: E402
 
 
-class TestLILADataset:
+class TestTrainValLILADataset:
     """
     A unified class to allow for easy setup and teardown of global and
     reused data and objects, and sharing of common methods. See
@@ -112,7 +114,7 @@ class TestLILADataset:
 
         # Set name of directory where all test data for this test run will
         # be placed.
-        cls.test_data_directory = 'pytorch_ds_test_dir'
+        cls.test_data_directory = 'pytorch_tvds_test_dir'
 
         # Generate the test data and relevent paths
         cls.paths, cls.canonical_class_labels = generate_test_data(
@@ -159,11 +161,16 @@ class TestLILADataset:
         Ensure the LILADataset points to the currect directories and that
         they exist.
         """
+        assert os.path.exists(cls.ds._metadata_path)
         assert os.path.exists(cls.ds._data_dir)
         assert os.path.exists(cls.ds._A_dir)
         assert os.path.exists(cls.ds._notA_dir)
-        assert os.path.exists(cls.ds._U_dir)
-        assert os.path.exists(cls.ds._metadata_path)
+        # Running train/val not unknown class inference, so U members
+        # should not exist
+        # Adapted from:
+        # https://stackoverflow.com/a/29855337
+        with pytest.raises(AttributeError):
+            cls.ds._U_dir
 
     def test_docs_contents(cls):
         """
@@ -174,11 +181,6 @@ class TestLILADataset:
                                   (1, 'consectetur lorem'),
                                   (2, '42 adipiscing ipsum 42 s9t amet'),
                                   (3, 'adipiscing elit amet')]
-        assert cls.ds._U_docs == [(4, 'lorem 42 consectetur amet'
-                                   ' consectetur amet s9t'),
-                                  (5, 'lorem'),
-                                  (6, '42 ipsum s9t'),
-                                  (7, 'ipsum lorem')]
         assert cls.ds._notA_docs == [(8, '42 42 lorem s9t foo foo foo foo'
                                       ' foo foo foo foo'),
                                      (9, 'ipsum lorem s9t foo'),
@@ -186,6 +188,12 @@ class TestLILADataset:
                                       ' foo foo foo foo foo foo foo foo'
                                       ' foo'),
                                      (11, 'lorem foo foo')]
+        # Running train/val not unknown class inference, so U members
+        # should not exist
+        # Adapted from:
+        # https://stackoverflow.com/a/29855337
+        with pytest.raises(AttributeError):
+            cls.ds._U_docs
 
     def test_docs_vs_metadata(cls):
         """
@@ -217,28 +225,6 @@ class TestLILADataset:
             assert meta_data['num_words'] ==\
                 len(cls.ds._A_docs[idx % 4][1].split())
 
-        # U docs
-        for doc in cls.ds._U_docs:
-            idx = doc[0]
-            meta_data = cls.ds._metadata.loc[idx]
-
-            # Test file field
-            assert meta_data['file'] == f'U-{idx % 4}.txt'
-            # Test author field
-            assert isinstance(meta_data['author'],
-                              type(np.nan))
-            # Test genre field
-            assert meta_data['genre'] == 'mock genre 3'
-            # Test imposter_for field
-            assert isinstance(meta_data['imposter_for'], type(np.nan))
-            # Test canonical_class_label field
-            assert meta_data['canonical_class_label'] == 'U'
-            # Test class field
-            assert isinstance(meta_data['class'], type(np.nan))
-            # Test num_words field
-            assert meta_data['num_words'] ==\
-                len(cls.ds._U_docs[idx % 4][1].split())
-
         # notA docs
         for doc in cls.ds._notA_docs:
             idx = doc[0]
@@ -266,6 +252,13 @@ class TestLILADataset:
             assert meta_data['num_words'] ==\
                 len(cls.ds._notA_docs[idx % 4][1].split())
 
+        # Running train/val not unknown class inference, so U members
+        # should not exist
+        # Adapted from:
+        # https://stackoverflow.com/a/29855337
+        with pytest.raises(AttributeError):
+            cls.ds._U_docs
+
     def test_tokenization(cls):
         """
         Test that the LILADataset tokenizes the mock data correctly. While
@@ -276,33 +269,37 @@ class TestLILADataset:
         # Check that the root lists length is the same as the original
         # number of documents processed for each class
         assert len(cls.ds._A_docs_tokenized) == 4
-        assert len(cls.ds._U_docs_tokenized) == 4
         assert len(cls.ds._notA_docs_tokenized) == 4
+        # Running train/val not unknown class inference, so U members
+        # should not exist
+        # Adapted from:
+        # https://stackoverflow.com/a/29855337
+        with pytest.raises(AttributeError):
+            cls.ds._U_docs_tokenized
 
         # Get the input_ids from the PyTorch embedding for the first
         # document in each class
         At_ids = cls.ds._A_docs_tokenized[0][1].input_ids.tolist()[0]
         nAt_ids = cls.ds._notA_docs_tokenized[0][1].input_ids.tolist()[0]
-        Ut_ids = cls.ds._U_docs_tokenized[0][1].input_ids.tolist()[0]
+        # Running train/val not unknown class inference, so U members
+        # should not exist
+        # Adapted from:
+        # https://stackoverflow.com/a/29855337
+        with pytest.raises(AttributeError):
+            cls.ds._U_docs_tokenized
 
         # test for special BERT [CLS] and [SEP] tokens
         assert At_ids[0] == 101
-        assert Ut_ids[0] == 101
         assert nAt_ids[0] == 101
         assert At_ids[-1] == 102
-        assert Ut_ids[-1] == 102
         assert nAt_ids[-1] == 102
         # test or 'sane' middle values
         assert At_ids[1] > 102
-        assert Ut_ids[1] > 102
         assert nAt_ids[1] > 102
         # ensur nothing else screwy happened
         assert len(At_ids) >= 4
-        assert len(Ut_ids) >= 9
         assert len(nAt_ids) >= 6
         assert At_ids != nAt_ids
-        assert At_ids != Ut_ids
-        assert nAt_ids != Ut_ids
 
     def helper_test_cnking(cls, docs_tokenized, docs_cnked):
         """
@@ -367,14 +364,25 @@ class TestLILADataset:
         """
         cls.helper_test_cnking(cls.ds._A_docs_tokenized,
                                cls.ds._A_docs_cnked)
-        cls.helper_test_cnking(cls.ds._U_docs_tokenized,
-                               cls.ds._U_docs_cnked)
         cls.helper_test_cnking(cls.ds._notA_docs_tokenized,
                                cls.ds._notA_docs_cnked)
+        # Running train/val not unknown class inference, so U members
+        # should not exist
+        # Adapted from:
+        # https://stackoverflow.com/a/29855337
+        with pytest.raises(AttributeError):
+            cls.ds._U_docs_tokenized
+        with pytest.raises(AttributeError):
+            cls.ds._U_docs_cnked
 
         assert len(cls.ds._A_docs_cnked) == 4
-        assert len(cls.ds._U_docs_cnked) == 4
         assert len(cls.ds._notA_docs_cnked) == 4
+        # Running train/val not unknown class inference, so U members
+        # should not exist
+        # Adapted from:
+        # https://stackoverflow.com/a/29855337
+        with pytest.raises(AttributeError):
+            cls.ds._U_docs_cnked
 
     def test_pair_creation(cls):
         """
@@ -538,3 +546,416 @@ class TestLILADataset:
         finally:
             # Clean up k-folds specific dataset
             destroy_test_data(kfolds_dir)
+
+
+class TestInferLILADataset:
+    """
+    A unified class to allow for easy setup and teardown of global and
+    reused data and objects, and sharing of common methods. See
+    `setup_class`, `teardown_class`, `helper_test_cnking`.
+    """
+    @classmethod
+    def setup_class(cls):
+        """
+        Setup global and reused test data and objects.
+        """
+        # Create a mock dataset that can test some edge cases
+        # Dataset characteristics (minus omitted work `A-4.txt`):
+        #     Word Frequencies:
+        #     - elit:        1
+        #     - adipiscing:  2
+        #     - consectetur: 3
+        #     - amet:        4
+        #     - s9t:         5
+        #     - 42:          6
+        #     - ipsum:       7
+        #     - lorem:       8
+        #     - foo:         24
+        #     Vocab size: 9
+        #     Num words: 60
+        #     Average doc length: 5
+        #     Shortest doc: 1
+        #     Longest doc: 15
+        cls.dataset = [
+            'lorem ipsum',                                      # A-0
+            'consectetur lorem',                                # A-1
+            '42 adipiscing ipsum 42 s9t amet',                  # A-2
+            'adipiscing elit amet',                             # A-3
+            'foobar',                                           # A-4
+            'lorem ipsum',                                      # A-5
+            'consectetur lorem',                                # A-6
+            '42 adipiscing ipsum 42 s9t amet',                  # A-7
+            'adipiscing elit amet',                             # A-8
+            'foobar',                                           # A-9
+            'lorem 42 consectetur amet consectetur amet s9t',   # U-0
+            'lorem',                                            # U-1
+            '42 ipsum s9t',                                     # U-2
+            'ipsum lorem',                                      # U-3
+            '42 42 lorem s9t foo foo foo foo foo foo foo foo',  # notA-0
+            'ipsum lorem s9t foo',                              # notA-1
+            'ipsum ipsum foo foo foo foo foo foo foo foo foo'
+            ' foo foo foo foo',                                 # notA-2
+            'lorem foo foo'                                     # notA-3
+        ]
+        cls.metadata_rows = [['A-0.txt', 'aauth', 'A author',
+                              'mock genre 1', None, 'A', 1, False,
+                              len(cls.dataset[0].split())],
+                             ['A-1.txt', 'aauth', 'A author',
+                              'mock genre 1', None, 'A', 1, False,
+                              len(cls.dataset[1].split())],
+                             ['A-2.txt', 'aauth', 'A author',
+                              'mock genre 1', None, 'A', 1, False,
+                              len(cls.dataset[2].split())],
+                             ['A-3.txt', 'aauth', 'A author',
+                              'mock genre 1', None, 'A', 1, False,
+                              len(cls.dataset[3].split())],
+                             ['A-4.txt', 'aauth', 'A author',
+                              'mock genre 1', None, 'A', 1, False,
+                              len(cls.dataset[4].split())],
+                             ['A-5.txt', 'aauth', 'A author',
+                              'mock genre 1', None, 'A', 1, False,
+                              len(cls.dataset[5].split())],
+                             ['A-6.txt', 'aauth', 'A author',
+                              'mock genre 1', None, 'A', 1, False,
+                              len(cls.dataset[6].split())],
+                             ['A-7.txt', 'aauth', 'A author',
+                              'mock genre 1', None, 'A', 1, False,
+                              len(cls.dataset[7].split())],
+                             ['A-8.txt', 'aauth', 'A author',
+                              'mock genre 1', None, 'A', 1, False,
+                              len(cls.dataset[8].split())],
+                             ['A-9.txt', 'aauth', 'A author',
+                              'mock genre 1', None, 'A', 1, False,
+                              len(cls.dataset[9].split())],
+
+                             ['U-0.txt', None, None, 'mock genre 3',
+                              None, 'U', None, False,
+                              len(cls.dataset[10].split())],
+                             ['U-1.txt', None, None, 'mock genre 3',
+                              None, 'U', None, False,
+                              len(cls.dataset[11].split())],
+                             ['U-2.txt', None, None, 'mock genre 3',
+                              None, 'U', None, False,
+                              len(cls.dataset[12].split())],
+                             ['U-3.txt', None, None, 'mock genre 3',
+                              None, 'U', None, False,
+                              len(cls.dataset[13].split())],
+
+                             ['notA-0.txt', 'naauth', 'Imposter author',
+                              'mock genre 1', 'John', 'notA', 0, False,
+                              len(cls.dataset[14].split())],
+                             ['notA-1.txt', 'naauth', 'Imposter author',
+                              'mock genre 2', 'John', 'notA', 0, False,
+                              len(cls.dataset[15].split())],
+                             ['notA-2.txt', 'naauth', 'Imposter author',
+                              'mock genre 1', 'Jane', 'notA', 0, False,
+                              len(cls.dataset[16].split())],
+                             ['notA-3.txt', 'naauth', 'Imposter author',
+                              'mock genre 2', 'Jane', 'notA', 0, False,
+                              len(cls.dataset[17].split())]]
+
+        # Set name of directory where all test data for this test run will
+        # be placed.
+        cls.test_data_directory = 'pytorch_infds_test_dir'
+
+        # Generate the test data and relevent paths
+        cls.paths, cls.canonical_class_labels = generate_test_data(
+            cls.test_data_directory, cls.dataset, cls.metadata_rows)
+
+        # Reset any existing splits
+        LILADataset.reset_splits()
+
+        # Insantiate PyTorch dataset object with mock data
+        # and toy parameters for testing
+        cls.cnk_size = 5
+        # Garbage value because inference LILA does not parameterize
+        # number of pairs
+        cls.num_pairs = 0
+        cls.seed = 1
+        # Adapted from:
+        # https://stackoverflow.com/a/29855337
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+
+            cls.ds = LILADataset(cls.paths['undistorted_dir'],
+                                 cls.paths['test_metadata_path'],
+                                 cnk_size=cls.cnk_size,
+                                 num_pairs=cls.num_pairs,
+                                 seed=cls.seed,
+                                 letters=True)
+
+            # Verify that the warning was raised
+            assert len(w) > 0
+            assert issubclass(w[-1].category, UserWarning)
+
+    @classmethod
+    def teardown_class(cls):
+        """
+        Clean up test data.
+        """
+
+        # Remove everything after tests have run
+        destroy_test_data(cls.test_data_directory)
+
+    def test_dataset_exists(cls):
+        """
+        Trivial test to ensure LILADataset can instantiate
+        """
+
+        assert isinstance(cls.ds, LILADataset)
+
+    def test_metadata_exists(cls):
+        """
+        Trivial test to ensure the metadata file was created
+        """
+        assert os.path.exists(cls.paths['test_metadata_path'])
+
+    def test_dataset_subdirs_exist(cls):
+        """
+        Ensure the LILADataset points to the currect directories and that
+        they exist.
+        """
+        assert os.path.exists(cls.ds._metadata_path)
+        assert os.path.exists(cls.ds._data_dir)
+        assert os.path.exists(cls.ds._A_dir)
+        # Running infer not train/val, so notA members should not exist
+        # Adapted from:
+        # https://stackoverflow.com/a/29855337
+        with pytest.raises(AttributeError):
+            cls.ds._notA_dir
+        # Running infer so U members should exist
+        assert os.path.exists(cls.ds._U_dir)
+
+    def test_docs_contents(cls):
+        """
+        Test that the contents of the LILADataset docs are the same as the
+        mock data passed in.
+        """
+        print(cls.ds._A_docs)
+        assert cls.ds._A_docs == [(0, 'lorem ipsum'),
+                                  (1, 'consectetur lorem'),
+                                  (2, '42 adipiscing ipsum 42 s9t amet'),
+                                  (3, 'adipiscing elit amet'),
+                                  (4, 'foobar'),
+                                  (5, 'lorem ipsum'),
+                                  (6, 'consectetur lorem'),
+                                  (7, '42 adipiscing ipsum 42 s9t amet'),
+                                  (8, 'adipiscing elit amet'),
+                                  (9, 'foobar')]
+        # Running infer so U members should exist
+        assert cls.ds._U_docs == [(10, 'lorem 42 consectetur amet'
+                                   ' consectetur amet s9t'),
+                                  (11, 'lorem'),
+                                  (12, '42 ipsum s9t'),
+                                  (13, 'ipsum lorem')]
+        # Running infer not train/val, so notA members should not exist
+        # Adapted from:
+        # https://stackoverflow.com/a/29855337
+        with pytest.raises(AttributeError):
+            cls.ds._notA_docs
+
+    def test_docs_vs_metadata(cls):
+        """
+        Test whether the docs lists belonging LILADataset agree with its
+        metadata.
+        """
+
+        # A docs
+        num_A_docs = len(cls.ds._A_docs)
+        for doc in cls.ds._A_docs:
+            idx = doc[0]
+            meta_data = cls.ds._metadata.loc[idx]
+
+            # Test file field
+            assert meta_data['file'] == f'A-{idx % num_A_docs}.txt'
+            # Test author field
+            assert meta_data['author'] == 'A author'
+            # Test genre field
+            assert meta_data['genre'] == 'mock genre 1'
+            # Test imposter_for field
+            assert isinstance(meta_data['imposter_for'], type(np.nan))
+            # Test canonical_class_label field
+            assert meta_data['canonical_class_label'] == 'A'
+            # Test class field
+            assert meta_data['class'] == 1
+            # Test num_words field
+            assert meta_data['num_words'] ==\
+                len(cls.ds._A_docs[idx % num_A_docs][1].split())
+
+        # Running infer so U members should exist
+        # U docs
+        for doc_num, doc in enumerate(cls.ds._U_docs):
+            idx = doc[0]
+            meta_data = cls.ds._metadata.loc[idx]
+
+            # Test file field
+            assert meta_data['file'] == f'U-{doc_num}.txt'
+            # Test author field
+            assert isinstance(meta_data['author'],
+                              type(np.nan))
+            # Test genre field
+            assert meta_data['genre'] == 'mock genre 3'
+            # Test imposter_for field
+            assert isinstance(meta_data['imposter_for'], type(np.nan))
+            # Test canonical_class_label field
+            assert meta_data['canonical_class_label'] == 'U'
+            # Test class field
+            assert isinstance(meta_data['class'], type(np.nan))
+            # Test num_words field
+            assert meta_data['num_words'] ==\
+                len(cls.ds._U_docs[doc_num][1].split())
+
+        # Running infer not train/val, so notA members should not exist
+        # Adapted from:
+        # https://stackoverflow.com/a/29855337
+        with pytest.raises(AttributeError):
+            cls.ds._notA_docs
+
+    def test_tokenization(cls):
+        """
+        Test that the LILADataset tokenizes the mock data correctly. While
+        this is not an exhaustive test, it tests boundary conditions and
+        for 'sane' tokenized data characteristics.
+        """
+
+        # Check that the root lists length is the same as the original
+        # number of documents processed for each class
+        assert len(cls.ds._A_docs_tokenized) == 10
+        # Running infer not train/val, so notA members should not exist
+        # Adapted from:
+        # https://stackoverflow.com/a/29855337
+        with pytest.raises(AttributeError):
+            cls.ds._notA_docs_tokenized
+        # Running infer so U members should exist
+        assert len(cls.ds._U_docs_tokenized) == 4
+
+        # Get the input_ids from the PyTorch embedding for the first
+        # document in each class
+        At_ids = cls.ds._A_docs_tokenized[0][1].input_ids.tolist()[0]
+        # Running infer so U members should exist
+        Ut_ids = cls.ds._U_docs_tokenized[0][1].input_ids.tolist()[0]
+
+        # test for special BERT [CLS] and [SEP] tokens
+        assert At_ids[0] == 101
+        # Running infer so U members should exist
+        assert Ut_ids[0] == 101
+        assert At_ids[-1] == 102
+        # Running infer so U members should exist
+        assert Ut_ids[-1] == 102
+        # test or 'sane' middle values
+        assert At_ids[1] > 102
+        # Running infer so U members should exist
+        assert Ut_ids[1] > 102
+        # ensur nothing else screwy happened
+        assert len(At_ids) >= 4
+        # Running infer so U members should exist
+        assert len(Ut_ids) >= 9
+        # Running infer so U members should exist
+        assert At_ids != Ut_ids
+
+    def helper_test_cnking(cls, docs_tokenized, docs_cnked):
+        """
+        A generalized routine for the `test_cnking` test.
+        This routine does that actual work of testing the chunking
+        mechanism in LILADataset. It is parameterized to allow testing for
+        different class based collections of tokenized docs (A, U, notA).
+
+        :param docs_tokenized: <Required> List of tuples representing
+        belonging to the A, U, or notA canonical classes in the LILA
+        dataset, where the first tuple element is the associated index for
+        the given file in the `LILADataset._metadata` member, and the
+        second element is a PyTorch embedding of the tokenized contents.
+        :type docs_tokenized: list
+
+        :param docs_cnked: <Required> The actual collection of chunked
+        and tokenized documents belonging to the LILADataset (A, U, notA).
+        A list of tuples, where the first tuple element is the associated
+        index for a given file in the `LILADataset._metadata` member, and
+        the second element is a list of PyTorch embeddings of the chunks
+        generated from that file.
+        :type A_docs_cnked: list
+        """
+        for i, (doc_idx, doc) in enumerate(docs_tokenized):
+            ts = doc.input_ids[0, 1:-1]
+            length = ts.size()[0]
+            cnk_len = cls.cnk_size - 2
+            real_cnks = docs_cnked[i][1]
+            # Create tensors for special tokens
+            cls_token = torch.tensor([cls.ds.tokenizer.cls_token_id])
+            sep_token = torch.tensor([cls.ds.tokenizer.sep_token_id])
+            for cnk_start in range(0, length, cnk_len):
+                expected_cnk_ids = ts[cnk_start:cnk_start + cnk_len]
+                # Add CLS token at start
+                expected_cnk_ids = torch.cat([cls_token,
+                                              expected_cnk_ids,
+                                              sep_token],
+                                             dim=0)
+                short = (cnk_len + 2) - expected_cnk_ids.size()[0]
+                if short > 0:
+                    # # Adapted from:
+                    # # https://pytorch.org/docs/stable/generated/torch.nn.functional.pad.html  # noqa: E501
+                    # expected_cnk_ids = F.pad(expected_cnk_ids,
+                    #                          (0, short),
+                    #                          "constant",
+                    #                          0)  # effectively 0 padding
+                    # Throw away for now
+                    continue
+                expected_cnk_ids = expected_cnk_ids.unsqueeze(dim=0)
+                real_cnk_index = int(cnk_start/cnk_len)
+                real_cnk_ids = real_cnks[real_cnk_index]['input_ids']
+                # Adapted from:
+                # https://stackoverflow.com/a/54187453
+                assert torch.equal(real_cnk_ids, expected_cnk_ids)
+
+    def test_cnking(cls):
+        """
+        This is a test of the chunking mechanism in the LILADataset. It
+        calls `helper_test_cnking()` method which does that actual
+        end-testing.
+        It also trivially checks for correct lengths of the collections.
+        """
+        cls.helper_test_cnking(cls.ds._A_docs_tokenized,
+                               cls.ds._A_docs_cnked)
+        # Running infer so U members should exist
+        cls.helper_test_cnking(cls.ds._U_docs_tokenized,
+                               cls.ds._U_docs_cnked)
+
+        assert len(cls.ds._A_docs_cnked) == 10
+        # Running infer not train/val, so notA members should not exist
+        # Adapted from:
+        # https://stackoverflow.com/a/29855337
+        with pytest.raises(AttributeError):
+            cls.ds._notA_docs_cnked
+        # Running infer so U members should exist
+        assert len(cls.ds._U_docs_cnked) == 4
+
+    def test_pair_creation(cls):
+        """
+        Test that the LILADataset creates pairs correctly. While this is
+        not an exhaustive test, it tests boundary conditions and for
+        'sane' pair creations characteristics.
+        """
+
+        # Check that the correct number of pairs were generated
+        # We will pair each U chunk with ten randomly selected A chunks
+        # for statistical robustness.
+        assert len(cls.ds._pairs) == sum([len(cnks[1])
+                                          for cnks
+                                          in cls.ds._U_docs_cnked]) * 10
+
+        # Check that all anchor chunks are the ordered chunks in
+        # cls.ds._U_docs_cnked
+        U_cnks_flat = []
+        for doc in cls.ds._U_docs_cnked:
+            U_cnks_flat.extend([cnk['input_ids'].tolist() for cnk in doc[1]])
+
+        for pair in cls.ds._pairs:
+            assert pair[0]['input_ids'].tolist() in U_cnks_flat
+
+        # Check that all other chunks are A chunks
+        A_cnks_flat = []
+        for doc in cls.ds._A_docs_cnked:
+            A_cnks_flat.extend([cnk['input_ids'].tolist() for cnk in doc[1]])
+
+        for pair in cls.ds._pairs:
+            assert pair[1]['input_ids'].tolist() in A_cnks_flat
