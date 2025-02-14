@@ -30,5 +30,5 @@ vashti.txt,aje,Augusta J. Evans,Pros/Fiction,LaSalle,notA,0,TRUE,156787
 digging_through_to_manila.txt,lcp,LaSalle Corbell Pickett,Poems,,A,1,TRUE,851
 introduction_heart_of_solider.txt,lcp,LaSalle Corbell Pickett,Pros/Misc.,,A,1,TRUE,4548
 note_from_heart_of_soldier.txt,lcp,LaSalle Corbell Pickett,Pros/Misc.,,A,1,TRUE,233
-heart_of_soldier.txt,,,Love Letters,,U,,TRUE,26213
-soldier_of_the_south.txt,,,Love Letters,,U,,TRUE,13742
+heart_of_soldier.txt,,,Love Letters,,U,,FALSE,26213
+soldier_of_the_south.txt,,,Love Letters,,U,,FALSE,13742
