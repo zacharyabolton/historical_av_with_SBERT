@@ -59,9 +59,9 @@ class Logger():
               f" {self.experiment_name}\n")
 
         self.folds_losses = []
-        self.folds_hedged_sims = []
-        self.folds_true_sims = []
-        self.folds_truths = [] 
+        self.epoch_hedged_sims = []
+        self.epoch_true_sims = []
+        self.epoch_truths = []
         self.folds_hedged_scores = pd.DataFrame(columns=['experiment',
                                                          'fold',
                                                          'epoch',
@@ -134,10 +134,9 @@ class Logger():
                                                        'brier',
                                                        'overall',
                                                        'sub_overall'])
-        self.folds_hedged_sims = []
-        self.folds_true_sims = []
-        self.folds_truths = []
-
+        self.epoch_hedged_sims = []
+        self.epoch_true_sims = []
+        self.epoch_truths = []
 
     def log_train_results(self,
                           view_path,
@@ -742,16 +741,21 @@ class Logger():
         self.folds_true_scores.to_csv(true_scores_filepath,
                                       index=False)
 
-        if len(self.folds_hedged_sims) == fold_idx + 1:
-            # Same fold as prior, overwrite
-            self.folds_hedged_sims[-1] = hedged_similarities
-            self.folds_true_sims[-1] = val_similarities
-            self.folds_truths[-1] = val_truths
-        else:
-            # New fold, start new plot
-            self.folds_hedged_sims.append(hedged_similarities)
-            self.folds_true_sims.append(val_similarities)
-            self.folds_truths.append(val_truths)
+        # Save the sims/preds to disk.
+        # Adapted from:
+        # https://stackoverflow.com/a/28440249
+        hedged_sims_file = (f'{self.experiment_name}_hedged_similarities'
+                            f'_fold_{fold_idx}_epoch_{epoch_idx}.npy')
+        true_sims_file = (f'{self.experiment_name}_true_similarities'
+                          f'_fold_{fold_idx}_epoch_{epoch_idx}.npy')
+        truths_file = (f'{self.experiment_name}_truths'
+                       f'_fold_{fold_idx}_epoch_{epoch_idx}.npy')
+        hedged_sims_path = os.path.join(view_out_path, hedged_sims_file)
+        true_sims_path = os.path.join(view_out_path, true_sims_file)
+        truths_path = os.path.join(view_out_path, truths_file)
+        np.save(hedged_sims_path, hedged_similarities)
+        np.save(true_sims_path, np.array(val_similarities))
+        np.save(truths_path, np.array(val_truths))
 
         if epoch_idx == num_epochs - 1 and fold_idx == 0:
             # Only generate confusion matrices on the final epoch of the
@@ -907,18 +911,6 @@ class Logger():
                                             true_scores_filename)
         self.folds_true_scores.to_csv(true_scores_filepath, index=False)
 
-        # Save the sims/preds to disk.
-        # Adapted from:
-        # https://stackoverflow.com/a/28440249
-        hedged_sims_file = f'{self.experiment_name}_hedged_similarities.npy'
-        true_sims_file = f'{self.experiment_name}_true_similarities.npy'
-        truths_file = f'{self.experiment_name}_truths.npy'
-        hedged_sims_path = os.path.join(view_out_path, hedged_sims_file)
-        true_sims_path = os.path.join(view_out_path, true_sims_file)
-        truths_path = os.path.join(view_out_path, truths_file)
-        np.save(hedged_sims_path, np.array(self.folds_hedged_sims))
-        np.save(true_sims_path, np.array(self.folds_true_sims))
-        np.save(truths_path, np.array(self.folds_truths))
         self.reset_val_scores()
 
     def save_model(self,
