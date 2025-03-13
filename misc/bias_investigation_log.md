@@ -1,4 +1,4 @@
-# Appendix I. Bias Investigation Log
+# Bias Investigation Log
 
 **Summary Investigation Results**
 Correct Labels: ✅
