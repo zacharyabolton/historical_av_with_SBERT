@@ -1,7 +1,3 @@
----
-cssclasses:
-  - word-break-all-third-col
----
 This is a dataset for Authorship Verification concerning the love letters attributed to General George E. Pickett C.S.A., published posthumously by his wife, LaSalle Corbell Pickett in her books _The Heart of a Soldier, As Revealed in the Intimate Letters of Gen'l George E. Pickett, C.S.A. (1913)_ and _Soldier of the South: General Pickett's War Letters to His Wife (edited by Arthur Crew Inman, 1928)_.
 
 It contains the love letters, known works of LaSalle, and 'imposter' works - works chosen for their authors' socio-demographic similarity to LaSalle or the general.

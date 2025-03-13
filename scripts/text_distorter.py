@@ -108,7 +108,7 @@ def dv_ma(text, W_k):
     # Loop through words
     for i, word in enumerate(words):
         if (word.lower() in W_k):
-            # Leave words not in `W_k` untouched
+            # Leave words in `W_k` untouched
             continue
         else:
             # Distort words not in `W_k`
@@ -136,7 +136,7 @@ def dv_sa(text, W_k):
     # Loop through words
     for i, word in enumerate(words):
         if (word.lower() in W_k):
-            # Leave words not in `W_k` untouched
+            # Leave words in `W_k` untouched
             continue
         else:
             # Distort words not in `W_k`
